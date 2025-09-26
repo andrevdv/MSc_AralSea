@@ -135,3 +135,10 @@ _build/
 
 # poetry files
 pyproject.toml
+
+
+#My files
+/**/pcrglobwb_2025*/
+/**/forcing_9095/
+/**/AralSea_Basin/
+
