@@ -141,4 +141,4 @@ pyproject.toml
 /**/pcrglobwb_2025*/
 /**/forcing_*/
 /**/AralSea_Basin/
-
+*.nc
