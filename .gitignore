@@ -142,3 +142,5 @@ pyproject.toml
 /**/forcing_*/
 /**/AralSea_Basin/
 *.nc
+*.csv
+*.xlsx
