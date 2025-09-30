@@ -144,3 +144,6 @@ pyproject.toml
 *.nc
 *.csv
 *.xlsx
+PCR_GLOBWB_model/model
+*.bak
+
