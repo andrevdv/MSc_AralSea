@@ -146,4 +146,4 @@ pyproject.toml
 *.xlsx
 PCR_GLOBWB_model/model
 *.bak
-
+*.png
