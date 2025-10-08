@@ -139,7 +139,9 @@ pyproject.toml
 
 #My files
 /**/pcrglobwb_2025*/
+/**/leakybucket_2025*/
 /**/forcing_*/
+/**/esmvaltool_output/
 /**/AralSea_Basin/
 *.nc
 *.csv
