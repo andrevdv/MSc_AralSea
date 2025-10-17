@@ -150,3 +150,4 @@ PCR_GLOBWB_model/model
 *.bak
 *.png
 book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/Images_etc/planning.ipynb
+*.map
