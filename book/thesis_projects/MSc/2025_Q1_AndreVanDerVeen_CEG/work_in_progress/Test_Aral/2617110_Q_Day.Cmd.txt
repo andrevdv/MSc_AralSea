@@ -12,7 +12,7 @@
 # Country:               TM
 # Latitude (DD):       37.83
 # Longitude (DD):      65.25
-# Catchment area (km²):      309000.0
+# Catchment area (kmï¿½):      309000.0
 # Altitude (m ASL):        241.0
 # Next downstream station:      2817100
 # Remarks:               
@@ -21,7 +21,7 @@
 #
 # Data Set Content:      MEAN DAILY DISCHARGE (Q)
 #                        --------------------
-# Unit of measure:                  m³/s
+# Unit of measure:                  mï¿½/s
 # Time series:           1936-01 - 1989-12
 # No. of years:          55
 # Last update:           2018-05-29
