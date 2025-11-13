@@ -152,3 +152,5 @@ PCR_GLOBWB_model/model
 book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/Images_etc/planning.ipynb
 *.map
 *.txt
+*.json
+book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/PCR_UU/
