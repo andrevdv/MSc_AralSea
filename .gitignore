@@ -153,4 +153,4 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/Images_etc
 *.map
 *.txt
 *.json
-/**/PCR_UU/
+/**/PCR_UU/** */
