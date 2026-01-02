@@ -146,6 +146,8 @@ pyproject.toml
 /**/AralSea_Basin/
 *.nc
 *.csv
+!histogram_Aral_Sea_64m_UTM_0.csv
+!Aral_Tabel.csv
 *.xlsx
 PCR_GLOBWB_model/model
 *.bak
