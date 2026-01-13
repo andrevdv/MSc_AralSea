@@ -4,6 +4,11 @@ import shapely.geometry
 from pyproj import Geod
 from src.paths import *
 import pandas as pd
+from typing import Union, Sequence
+import numpy as np
+import fiona
+from shapely.geometry import shape, box
+
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
@@ -58,3 +63,54 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
     conversion_factor = 1e-3 / 86400 * area_m2
     model_output_m3s = model_output * conversion_factor
     return model_output_m3s
+
+def get_integer_multiple_bounds(
+    shapefiles: Union[str, Path, Sequence[Union[str, Path]]],
+    multiple: int = 3,
+):
+    """
+    docstring
+    docstring
+    docstring
+    """
+
+    # make list
+    if isinstance(shapefiles, (str, Path)):
+        shapefiles = [shapefiles]
+
+    # --- collect all bounds ---
+    min_xs, min_ys, max_xs, max_ys = [], [], [], []
+
+    for shp in shapefiles:
+        with fiona.open(shp) as src:
+            for feat in src:
+                geom = shape(feat["geometry"])
+                minx, miny, maxx, maxy = geom.bounds
+                min_xs.append(minx)
+                min_ys.append(miny)
+                max_xs.append(maxx)
+                max_ys.append(maxy)
+
+    # original bounds
+    lon_min = min(min_xs)
+    lat_min = min(min_ys)
+    lon_max = max(max_xs)
+    lat_max = max(max_ys)
+    # --- convert to integer bounds ---
+    lon_min_i = int(np.floor(lon_min))
+    lat_min_i = int(np.floor(lat_min))
+    lon_max_i = int(np.ceil(lon_max))
+    lat_max_i = int(np.ceil(lat_max))
+
+    # --- helper to expand to multiple ---
+    def expand_to_multiple(min_val, max_val, multiple):
+        extent = max_val - min_val
+        remainder = extent % multiple
+        if remainder != 0:
+            max_val += (multiple - remainder)
+        return min_val, max_val
+
+    lon_min_f, lon_max_f = expand_to_multiple(lon_min_i, lon_max_i, multiple)
+    lat_min_f, lat_max_f = expand_to_multiple(lat_min_i, lat_max_i, multiple)
+
+    return lon_min_f, lat_min_f, lon_max_f, lat_max_f
