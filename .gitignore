@@ -161,3 +161,14 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/Images_etc
 /**/custombucket*/
 /**/hbv_*/
 /**/GRDC*/
+
+
+# testing some git ignore magic
+#ignore everthing in this folder
+book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/forcing/output/**
+# keep forcing type
+!book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/forcing/output/*/
+# keep shapefile
+!book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/forcing/output/*/*/
+# Ignore everything inside shapefile folders
+book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/forcing/output/*/*/**
