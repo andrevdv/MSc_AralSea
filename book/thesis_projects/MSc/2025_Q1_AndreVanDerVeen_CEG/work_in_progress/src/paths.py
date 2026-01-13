@@ -19,7 +19,9 @@ SHAPEFILES = DATA / "shapefiles"
 # ------------------------------
 FORCING_FOLDER = ROOT / "forcing"
 FORCING_OUTPUT = FORCING_FOLDER / "output"
-
+FORCING_ERA5 = FORCING_OUTPUT / "ERA5"
+FORCING_CMIP_HIST = FORCING_OUTPUT / "CMIP_HIST"
+FORCING_CMIP_FUT = FORCING_OUTPUT / "CMIP_FUT"
 
 # ------------------------------
 # Outputs
@@ -27,7 +29,7 @@ FORCING_OUTPUT = FORCING_FOLDER / "output"
 OUTPUTS = ROOT / "outputs"
 FIGURES = OUTPUTS / "figures"
 MODEL_OUTPUT = OUTPUTS / "model_runs"
-OUTPUT_HBV = MODEL_OUTPUT / "hbv"
+OUTPUT_HBV = MODEL_OUTPUT / "HBV"
 OUTPUT_PCRGLOB = MODEL_OUTPUT / "pcr-globwb"
 
 
