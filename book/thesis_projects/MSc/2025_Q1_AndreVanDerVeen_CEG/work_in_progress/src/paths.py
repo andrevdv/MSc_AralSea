@@ -46,3 +46,8 @@ MODEL_RUNS = ROOT / "model_runs"
 RUNS_HBV = MODEL_RUNS / "hbv"
 RUNS_LB = MODEL_RUNS / "leakybucket"
 RUNS_PCR = MODEL_RUNS / "pcrglobwb"
+INI_FILES = RUNS_PCR / "ini_files"
+INI_COMPARISON = INI_FILES / "comparison_files"
+
+PCR_TAIL = "work/diagnostic/script"
+LOAD_PCR = "ERA5_1940-1960/AralSea_basin"

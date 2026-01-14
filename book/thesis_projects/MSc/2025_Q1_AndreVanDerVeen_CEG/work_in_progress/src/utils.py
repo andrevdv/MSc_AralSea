@@ -8,7 +8,8 @@ from typing import Union, Sequence
 import numpy as np
 import fiona
 from shapely.geometry import shape, box
-
+import configparser
+from datetime import datetime
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
@@ -114,3 +115,84 @@ def get_integer_multiple_bounds(
     lat_min_f, lat_max_f = expand_to_multiple(lat_min_i, lat_max_i, multiple)
 
     return lon_min_f, lat_min_f, lon_max_f, lat_max_f
+
+def _load_ini(path):
+    """Load ini file into a dictionary-like structure."""
+    cp = configparser.ConfigParser(interpolation=None)
+    cp.optionxform = str  # preserve case
+    cp.read(path)
+    return cp
+
+def _generate_comparison_filename(file1, file2):
+    # use stem names of INI files
+    name1 = Path(file1).stem
+    name2 = Path(file2).stem
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{name1}_vs_{name2}_{timestamp}.txt"
+    return INI_COMPARISON / filename
+
+def compare_inis(file1, file2): #, save_file=None):
+    cp1 = _load_ini(file1)
+    cp2 = _load_ini(file2)
+
+    output = []
+
+    output.append(f"\nComparing:\n  A = {file1}\n  B = {file2}\n")
+
+    # Compare sections
+    sections1 = set(cp1.sections())
+    sections2 = set(cp2.sections())
+
+    missing_in_B = sections1 - sections2
+    missing_in_A = sections2 - sections1
+
+    if missing_in_B:
+        output.append("Sections present in A but missing in B:")
+        for s in sorted(missing_in_B):
+            output.append(f"  - {s}")
+
+    if missing_in_A:
+        output.append("Sections present in B but missing in A:")
+        for s in sorted(missing_in_A):
+            output.append(f"  - {s}")
+
+    # Compare keys for shared sections
+    shared_sections = sections1 & sections2
+    for section in sorted(shared_sections):
+        keys1 = set(cp1[section].keys())
+        keys2 = set(cp2[section].keys())
+
+        missing_keys_in_B = keys1 - keys2
+        missing_keys_in_A = keys2 - keys1
+
+        if missing_keys_in_B or missing_keys_in_A:
+            output.append(f"\n[Section: {section}]")
+
+        if missing_keys_in_B:
+            output.append("  Keys present in A but missing in B:")
+            for k in sorted(missing_keys_in_B):
+                output.append(f"    - {k}")
+
+        if missing_keys_in_A:
+            output.append("  Keys present in B but missing in A:")
+            for k in sorted(missing_keys_in_A):
+                output.append(f"    - {k}")
+
+        # Compare values for keys present in both
+        for key in sorted(keys1 & keys2):
+            v1 = cp1[section][key].strip()
+            v2 = cp2[section][key].strip()
+            if v1 != v2:
+                output.append(f"\n  Value differs for: {section}.{key}")
+                output.append(f"    A: {v1}")
+                output.append(f"    B: {v2}")
+
+    # Print to console
+    #print("\n".join(output))
+    INI_COMPARISON.mkdir(parents=True, exist_ok=True)
+
+    auto_filename = _generate_comparison_filename(file1, file2)
+
+    # Optionally save to file
+    with open(auto_filename, "w") as f:
+        f.write("\n".join(output))
