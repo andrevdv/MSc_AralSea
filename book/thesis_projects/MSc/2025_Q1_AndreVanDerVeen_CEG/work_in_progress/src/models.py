@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 import shutil
 
-def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False):
+def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
     Run the HBV model with a given forcing and parameters.
 
@@ -42,7 +42,7 @@ def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True
     total_steps = int((model.end_time - model.start_time) / model.time_step)
 
     if show_progress:
-        pbar = tqdm(total=total_steps, desc="Running HBV model",mininterval=1.0)
+        pbar = tqdm(total=total_steps, desc="Running HBV model",mininterval=1.0, leave=leave_pbar)
 
     while model.time < model.end_time:
         model.update()
@@ -238,8 +238,9 @@ def run_ensemble_HBV(n_particles: int, forcing, delete_files = True):
             forcing=forcing,
             parameter_set=list_parameters[i],
             initial_conditions=s_0,
-            show_progress=False,
+            show_progress=True,
             delete_files=delete_files,
+            leave_pbar=False,
         )
         all_series.append(s)
     
