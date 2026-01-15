@@ -152,7 +152,18 @@ def run_PCRGLOBWB_model(forcing_path,ini_name, start_date,end_date):
     """
     Placeholder for running the PCR-GLOBWB model.
     """
-    print("starting model, might take a minute or so")
+    from tqdm import tqdm as classic_tqdm
+    # Convert ISO 8601 strings to datetime objects
+    start_time = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
+    end_time = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ')
+
+    # Calculate the number of days for the progression bar
+    delta = end_time - start_time
+    number_of_days = delta.days
+
+    pbar = classic_tqdm(total=number_of_days, desc="Initializing model", mininterval=1.0)
+
+
     # can be hardcoded, location of all the pcr-glob data on ewatercycle
     pcr_glob_directory = Path("/data/shared/parameter-sets/pcrglobwb_global")
     
@@ -182,16 +193,7 @@ def run_PCRGLOBWB_model(forcing_path,ini_name, start_date,end_date):
 
     model.initialize(model_config)
 
-    # Convert ISO 8601 strings to datetime objects
-    start_time = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
-    end_time = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ')
-
-    # Calculate the number of days for the progression bar
-    delta = end_time - start_time
-    number_of_days = delta.days
-
-    pbar = tqdm(total=number_of_days, desc="Running model", mininterval=1.0)
-
+    pbar.set_description("Running model")
     while model.time < model.end_time:
 
         model.update()
@@ -200,7 +202,7 @@ def run_PCRGLOBWB_model(forcing_path,ini_name, start_date,end_date):
 
 
     pbar.close()
-    print("Model run finished!")
+    tqdm.write("Model run finished!")
 
     model.finalize()
 
