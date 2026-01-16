@@ -70,11 +70,19 @@ def get_integer_multiple_bounds(
     multiple: int = 3,
 ):
     """
-    docstring
-    docstring
-    docstring
+    Get the bounding box of one or more shapefiles, expanded to the nearest integer
+    multiples.
+    Parameters
+    ----------
+    shapefiles : str, Path, or list of str/Path
+        Path(s) to the shapefile(s).
+    multiple : int, optional    
+        The multiple to which the bounds should be expanded (default is 3).
+    Returns
+    -------
+    tuple
+        A tuple containing (lon_min, lat_min, lon_max, lat_max) expanded to the nearest multiples.
     """
-
     # make list
     if isinstance(shapefiles, (str, Path)):
         shapefiles = [shapefiles]
@@ -124,6 +132,7 @@ def _load_ini(path):
     return cp
 
 def _generate_comparison_filename(file1, file2):
+    """Generate a filename for the comparison output based on the two INI files being compared."""
     # use stem names of INI files
     name1 = Path(file1).stem
     name2 = Path(file2).stem
@@ -132,6 +141,15 @@ def _generate_comparison_filename(file1, file2):
     return INI_COMPARISON / filename
 
 def compare_inis(file1, file2): #, save_file=None):
+    """
+    Compare two INI files and print differences to console and save to a file.
+    Parameters
+    ----------  
+    file1 : str or Path
+        Path to the first INI file.
+    file2 : str or Path
+        Path to the second INI file.
+    """
     cp1 = _load_ini(file1)
     cp2 = _load_ini(file2)
 
@@ -189,6 +207,7 @@ def compare_inis(file1, file2): #, save_file=None):
 
     # Print to console
     #print("\n".join(output))
+
     INI_COMPARISON.mkdir(parents=True, exist_ok=True)
 
     auto_filename = _generate_comparison_filename(file1, file2)
