@@ -303,7 +303,7 @@ def plot_dem_map(
 
 
 ## make koppen-geiger figure
-def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=True, show_plot=True):
+def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=True, show_plot=True, show_title=True):
     """
     Docstring for plot_koppen_geiger
     """
@@ -335,12 +335,12 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
     shapefiles = {
         # "Amu Darya": {"path": SHAPEFILES/"Chatly_GRDC/Chatly_GRDC.shp", "edgecolor": "blue", "linewidth": 2},
         # "Syr Darya": {"path": SHAPEFILES/"Kazalinsk_GRDC/Kazalinsk_GRDC.shp", "edgecolor": "red", "linewidth": 2},
-        "Aral Sea Basin": {"path": SHAPEFILES/"AralSea_basin/AralSea_basin.shp", "edgecolor": "black", "linewidth": 2, "linestyle":"-"}
+        "Aral Sea Basin": {"path": SHAPEFILES/"AralSea_basin/AralSea_basin.shp", "edgecolor": "black", "linewidth": 1, "linestyle":"-"}
     }
 
     
     # --- Cartopy figure ---
-    fig = plt.figure(figsize=(12,8), dpi = 300)
+    fig = plt.figure(figsize=(10,10), dpi = 300)
     ax = plt.axes(projection=ccrs.PlateCarree())
     ax.set_extent([54, 82, 33, 53], crs=ccrs.PlateCarree())
 
@@ -348,6 +348,7 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
     ax.imshow(data, cmap=cmap, norm=norm,
             origin='upper',
             extent=[-180, 180, -90, 90],  # full raster extent
+            #extent=[54, 82, 33, 53],  # full raster extent
             transform=ccrs.PlateCarree())
 
 
@@ -402,8 +403,9 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
     else:  # historical
         year_range = parts[-2]
         title_str = f"Köppen-Geiger Map ({year_range})"
-
-    plt.title(title_str, fontsize=14)
+    
+    if show_title:
+        plt.title(title_str, fontsize=14)
 
     plt.tight_layout()
 
