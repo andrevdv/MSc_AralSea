@@ -10,6 +10,16 @@ import numpy as np
 from matplotlib.lines import Line2D
 import matplotlib.patheffects as pe
 import cmocean
+import rasterio
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+import cartopy.crs as ccrs
+from cartopy.io.shapereader import Reader
+from cartopy.feature import ShapelyFeature, BORDERS, LAKES, RIVERS, COASTLINE, OCEAN
+from src.paths import  SHAPEFILES
 
 def plot_shapefile_overview(
     shapefile,
@@ -290,3 +300,147 @@ def plot_dem_map(
     plt.show()
     
     return fig, ax
+
+
+## make koppen-geiger figure
+def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=True, show_plot=True):
+    """
+    Docstring for plot_koppen_geiger
+    """
+    path_to_file = Path(path_to_file)  # <-- make sure this is here
+    parts = path_to_file.parts          # <-- now parts is defined
+
+    with rasterio.open(path_to_file) as src:
+        data = src.read(1)
+
+    class_names = ["Af","Am","Aw","BWh","BWk","BSh","BSk","Csa","Csb","Csc",
+               "Cwa","Cwb","Cwc","Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
+               "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd","ET","EF"]
+
+
+    rgb_colors = np.array([
+        [0, 0, 255], [0, 120, 255], [70, 170, 250], [255, 0, 0], [255, 150, 150],
+        [245, 165, 0], [255, 220, 100], [255, 255, 0], [200, 200, 0], [150, 150, 0],
+        [150, 255, 150], [100, 200, 100], [50, 150, 50], [200, 255, 80], [100, 255, 80],
+        [50, 200, 0], [255, 0, 255], [200, 0, 200], [150, 50, 150], [150, 100, 150],
+        [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
+        [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
+    ])/255
+
+
+    cmap = ListedColormap(rgb_colors)
+    norm = BoundaryNorm(np.arange(0.5, 31.5, 1), cmap.N)
+
+    # --- Shapefiles ---
+    shapefiles = {
+        # "Amu Darya": {"path": SHAPEFILES/"Chatly_GRDC/Chatly_GRDC.shp", "edgecolor": "blue", "linewidth": 2},
+        # "Syr Darya": {"path": SHAPEFILES/"Kazalinsk_GRDC/Kazalinsk_GRDC.shp", "edgecolor": "red", "linewidth": 2},
+        "Aral Sea Basin": {"path": SHAPEFILES/"AralSea_basin/AralSea_basin.shp", "edgecolor": "black", "linewidth": 2, "linestyle":"-"}
+    }
+
+    
+    # --- Cartopy figure ---
+    fig = plt.figure(figsize=(12,8), dpi = 300)
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([54, 82, 33, 53], crs=ccrs.PlateCarree())
+
+    # --- Plot raster ---
+    ax.imshow(data, cmap=cmap, norm=norm,
+            origin='upper',
+            extent=[-180, 180, -90, 90],  # full raster extent
+            transform=ccrs.PlateCarree())
+
+
+
+    # --- Add map features ---
+    ax.add_feature(COASTLINE, linewidth=1, edgecolor='black')
+    ax.add_feature(BORDERS, linewidth=1, edgecolor='black', linestyle=':')
+    ax.add_feature(LAKES, facecolor='lightblue', edgecolor='blue', zorder = 19)
+    ax.add_feature(RIVERS, edgecolor='blue', linewidth=1)
+    ax.add_feature(OCEAN, facecolor='lightblue', edgecolor='blue', zorder=20)
+
+
+    legend_handles = []
+
+    # Köppen classes for legend
+    for i, name in enumerate(class_names):
+        patch = Patch(facecolor=rgb_colors[i], edgecolor='k', label=f"{i+1}: {name}")
+        legend_handles.append(patch)
+
+    # Add shapefiles and legend handles
+    for label, cfg in shapefiles.items():
+        feature = ShapelyFeature(
+            Reader(cfg["path"]).geometries(),
+            ccrs.PlateCarree(),
+            facecolor="none",
+            edgecolor=cfg["edgecolor"],
+            linewidth=cfg["linewidth"],
+            linestyle=cfg["linestyle"]
+        )
+        ax.add_feature(feature)
+        legend_handles.append(Line2D([0], [0], color=cfg["edgecolor"], linewidth=2, label=label, linestyle=cfg["linestyle"]))
+
+    # --- Gridlines and labels ---
+    gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+
+    # --- Combined legend ---
+    if show_legend:
+        plt.legend(handles=legend_handles, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+
+    # # --- Title ---
+    # # plt.title("Köppen-Geiger Map for Aral Sea Basin", fontsize=14)
+
+        # --- Build dynamic title ---
+    if len(parts) >= 2 and parts[-2].startswith("ssp"):  # future scenario
+        scenario = parts[-2]
+        year_range = parts[-3]
+        title_str = f"Köppen-Geiger Map ({year_range}, {scenario})"
+    else:  # historical
+        year_range = parts[-2]
+        title_str = f"Köppen-Geiger Map ({year_range})"
+
+    plt.title(title_str, fontsize=14)
+
+    plt.tight_layout()
+
+        # --- Auto filename ---
+    if savefig:
+        # Extract parts from path
+        parts = path_to_file.parts
+        # Look for historical (1 folder) vs future (2 folders before filename)
+        if len(parts) >= 2 and parts[-2].startswith("ssp"):  # future
+            scenario = parts[-2]
+            year_range = parts[-3]
+            fname = f"koppen_{year_range}_{scenario}.png"
+        else:  # historical
+            year_range = parts[-2]
+            fname = f"koppen_{year_range}.png"
+
+        # Save directory
+        if save_dir:
+            save_path = Path(save_dir) / fname
+        else:
+            save_path = Path(fname)
+
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    
+    if show_plot:
+        plt.show()
+        return fig, ax
+    else:
+        plt.close(fig)
+        return None
+
+
+
+
+
+
+
+
+

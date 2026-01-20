@@ -12,7 +12,7 @@ DATA = ROOT / "data"
 GRDC = DATA / "grdc"           
 BATHYMETRY = DATA / "bathymetry"
 SHAPEFILES = DATA / "shapefiles"
-
+KOPPEN_GEIGER = DATA / "koppen_geiger_tif"
 
 # ------------------------------
 # Forcing
@@ -29,6 +29,9 @@ FORCING_PCRGLOB = FORCING_OUTPUT / "PCRGLOBWB"
 # ------------------------------
 OUTPUTS = ROOT / "outputs"
 FIGURES = OUTPUTS / "figures"
+KOPPEN_FIGURES = FIGURES / "koppen_geiger"
+
+TABLES = OUTPUTS / "tables"
 MODEL_OUTPUT = OUTPUTS / "model_runs"
 OUTPUT_HBV = MODEL_OUTPUT / "HBV"
 OUTPUT_PCRGLOB = MODEL_OUTPUT / "pcr-globwb"

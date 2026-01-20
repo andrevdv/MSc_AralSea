@@ -144,6 +144,7 @@ pyproject.toml
 /**/forcing_*/
 /**/esmvaltool_output/
 /**/AralSea_Basin/
+/**/koppen_geiger_tif/
 *.nc
 *.csv
 !histogram_Aral_Sea_64m_UTM_0.csv

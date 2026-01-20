@@ -10,6 +10,9 @@ import fiona
 from shapely.geometry import shape, box
 import configparser
 from datetime import datetime
+from pathlib import Path
+import re
+import pandas as pd
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
@@ -215,3 +218,235 @@ def compare_inis(file1, file2): #, save_file=None):
     # Optionally save to file
     with open(auto_filename, "w") as f:
         f.write("\n".join(output))
+
+
+# =====================================================
+# GRDC READER TO LATEX TABLE
+# =====================================================
+
+def _metadata_patterns() -> dict:
+    return {
+        "GRDC-No.": r"GRDC-No\.\s*:\s*(\d+)",
+        "Station": r"Station\s*:\s*(.+)",
+        "Latitude (DD)": r"Latitude \(DD\)\s*:\s*([-\d\.]+)",
+        "Longitude (DD)": r"Longitude \(DD\)\s*:\s*([-\d\.]+)",
+        "Catchment area (km²)": r"Catchment area \(km²\)\s*:\s*([-\d\.]+)",
+        "Time series": r"Time series\s*:\s*(.+)",
+        "Data lines": r"Data lines\s*:\s*(\d+)",
+        "Data Set Content": r"Data Set Content\s*:\s*(.+)",
+    }
+
+def _read_text_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin1")
+
+
+def _extract_metadata(content: str, patterns: dict) -> dict:
+    metadata = {}
+    for key, pattern in patterns.items():
+        match = re.search(pattern, content)
+        metadata[key] = match.group(1).strip() if match else None
+    return metadata
+
+def _determine_frequency(content: str | None) -> str:
+    if not content:
+        return "-"
+    content = content.upper()
+    if "DAILY" in content:
+        return "Daily"
+    if "MONTHLY" in content:
+        return "Monthly"
+    return "-"
+
+def _collect_metadata(folder: Path, patterns: dict) -> pd.DataFrame:
+    records = []
+
+    for txt_file in folder.glob("*.txt"):
+        text = _read_text_file(txt_file)
+        metadata = _extract_metadata(text, patterns)
+        metadata["Frequency"] = _determine_frequency(metadata.get("Data Set Content"))
+        records.append(metadata)
+
+    return pd.DataFrame(records)
+
+def _convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df["Data lines"] = df["Data lines"].astype("Int64")
+
+    df["Catchment area (km²)"] = df["Catchment area (km²)"].apply(
+        lambda x: int(float(x)) if pd.notna(x) else pd.NA
+    )
+
+    df["Data lines"] = df["Data lines"].map(
+        lambda x: "-" if pd.isna(x) or x == 0 else f"{x:,}"
+    )
+
+    return df
+
+def _round_coordinates(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
+    for col in ["Latitude (DD)", "Longitude (DD)"]:
+        df[col] = (
+            df[col]
+            .astype(float)
+            .round(decimals)
+            .map(lambda x: f"{x:.{decimals}f}" if pd.notna(x) else "-")
+        )
+    return df
+
+def _copy_nonempty_timeseries(df: pd.DataFrame) -> pd.DataFrame:
+    numeric = pd.to_numeric(
+        df["Data lines"].str.replace(",", "").replace("-", ""),
+        errors="coerce",
+    )
+    return df[numeric > 0].copy()
+
+def _select_and_rename_columns(df: pd.DataFrame) -> pd.DataFrame:
+    columns = {
+        "GRDC-No.": "GRDC No.",
+        "Station": "Station",
+        "Latitude (DD)": "Lat (°N)",
+        "Longitude (DD)": "Lon (°E)",
+        "Catchment area (km²)": "Catchment (km²)",
+        "Time series": "Time Series",
+        "Data lines": "Data Lines",
+        "Frequency": "Freq",
+    }
+
+    return df[list(columns.keys())].rename(columns=columns)
+
+def _sanitize_latex(value):
+    if isinstance(value, str):
+        return (
+            value.replace("_", r"\_")
+                 .replace("&", r"\&")
+                 .replace("%", r"\%")
+        )
+    return value
+
+
+def _sanitize_dataframe_for_latex(df: pd.DataFrame) -> pd.DataFrame:
+    return df.applymap(_sanitize_latex)
+
+def _export_to_latex(
+    df: pd.DataFrame,
+    output_path: Path,
+    caption: str,
+    label: str,
+    column_format: str,
+):
+    latex = df.to_latex(
+        index=False,
+        caption=caption,
+        label=label,
+        longtable=True,
+        escape=False,
+        column_format=column_format,
+    )
+    output_path.write_text(latex, encoding="utf-8")
+
+def _simplify_daily_timeseries(ts):
+    if pd.isna(ts):
+        return "-"
+    match = re.findall(r"(\d{4})", ts)
+    if match and len(match) >= 2:
+        return f"{match[0]} - {match[-1]}"
+    return ts
+
+def _split_by_frequency(df: pd.DataFrame):
+    df_daily = df[df["Freq"] == "Daily"].copy()
+    df_monthly = df[df["Freq"] == "Monthly"].copy()
+
+    # Daily: simplify time series, remove Freq
+    if not df_daily.empty:
+        df_daily["Time Series"] = df_daily["Time Series"].apply(
+            _simplify_daily_timeseries
+        )
+        df_daily.drop(columns=["Freq"], inplace=True)
+
+    # Monthly: just remove Freq
+    if not df_monthly.empty:
+        df_monthly.drop(columns=["Freq"], inplace=True)
+
+    return df_daily, df_monthly
+
+
+
+
+def _export_daily_monthly_tables(
+    df_daily: pd.DataFrame,
+    df_monthly: pd.DataFrame,
+    export_dir: Path,
+    base_filename: str,
+):
+    if not df_monthly.empty:
+        latex_monthly = df_monthly.to_latex(
+            index=False,
+            caption="Selected GRDC Station Metadata (Monthly)",
+            label="tab:grdc_selected_metadata_monthly",
+            longtable=True,
+            escape=False,
+            column_format="lp{4.3cm}llrlr",
+        )
+        (export_dir / f"{base_filename}_monthly.tex").write_text(
+            latex_monthly, encoding="utf-8"
+        )
+
+    if not df_daily.empty:
+        latex_daily = df_daily.to_latex(
+            index=False,
+            caption="Selected GRDC Station Metadata (Daily)",
+            label="tab:grdc_selected_metadata_daily",
+            longtable=True,
+            escape=False,
+            column_format="lp{4.3cm}llrlr",
+        )
+        (export_dir / f"{base_filename}_daily.tex").write_text(
+            latex_daily, encoding="utf-8"
+        )
+
+    
+
+def build_grdc_metadata_table(
+    folder_path: Path,
+    export_dir: Path | None = None,
+    split_daily_monthly: bool = True,
+    base_filename: str = "grdc_selected_metadata",
+) -> pd.DataFrame:
+    """
+    Build cleaned GRDC station metadata tables.
+
+    Parameters
+    ----------
+    folder_path : Path
+        Directory containing GRDC station .txt files.
+    export_dir : Path, optional
+        Directory where LaTeX tables will be written.
+    split_daily_monthly : bool, default True
+        If True, exports separate daily and monthly tables.
+    base_filename : str, default "grdc_selected_metadata"
+        Base name for exported LaTeX files (without suffix).
+    """
+
+    patterns = _metadata_patterns()
+
+    df = _collect_metadata(folder_path, patterns)
+    df = _convert_numeric_columns(df)
+    df = _round_coordinates(df)
+    df = _copy_nonempty_timeseries(df)
+    df = _select_and_rename_columns(df)
+    df = _sanitize_dataframe_for_latex(df)
+
+    if export_dir is not None:
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        if split_daily_monthly:
+            df_daily, df_monthly = _split_by_frequency(df)
+            _export_daily_monthly_tables(
+                df_daily,
+                df_monthly,
+                export_dir,
+                base_filename,
+            )
+
+    return df
