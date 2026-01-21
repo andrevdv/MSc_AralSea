@@ -7,6 +7,20 @@ import xarray as xr
 import xesmf as xe
 
 
+# ===========================================================================
+# FORCING GENERATION (LUMPED)
+# - Generate lumped forcing for use in HBV, Leaky Bucket, etc.
+# - Variables included:
+#     * temperature
+#     * precipitation
+#     * incoming_shortwave_radiation
+#     * potential_evaporation
+# - Sources included:
+#     * ERA5 (observations / reference)
+#     * CMIP historical
+#     * CMIP future (SSP scenarios)
+# ===========================================================================
+
 
 def setup_ERA5_forcing(shape_name: str, start: str, end: str):
     """
@@ -230,6 +244,17 @@ def create_forcing_slice(forcing_obj, start, end):
 
     return sliced
 
+# ===========================================================================
+# FORCING GENERATION (PCR-GLOBWB)
+# - Generate combined PCR-GLOBWB forcing
+# - Variables included:
+#     * temperature
+#     * precipitation
+# - Includes:
+#     * ERA5 (observations / reference)
+#     * CMIP historical
+#     * CMIP future (SSP scenarios)
+# ===========================================================================
 
 def setup_ERA5_PCR_forcing(shape_name: str, start: str, end: str):
     """
@@ -436,9 +461,12 @@ def setup_cmip_fut_PCR_forcing(shape_name: str, start: str, end: str,ssp: str, m
 
 
 
-###------------------------------------------------------------------------
-#  REGRIDDING
-###------------------------------------------------------------------------
+# ===========================================================================
+# REGRIDDING
+# - Regrid CMIP forcing to ERA5 grid
+# - Applies to precipitation and temperature variables
+# - Overwrites original CMIP files 
+# ===========================================================================
 
 def regrid_pcrglobwb_forcing(cmip_forcing, era5_forcing):
     """
@@ -564,3 +592,11 @@ def detect_forcing_variable(ds):
     raise ValueError(
         f"Could not detect forcing variable from variables: {varnames}"
     )
+
+
+# ===========================================================================
+# Bias correction forcing
+# - Apply monthly bias factors to precipitation and temperature
+# - Uses ERA5 as reference
+# ===========================================================================
+
