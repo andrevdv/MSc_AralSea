@@ -251,7 +251,119 @@ def run_ensemble_HBV(n_particles: int, forcing, delete_files = True):
 
     return df_all
 
+# ===========================================================================
+# better way of calibration?
+# using scipy optimize
+# more text to be added here
+# ===========================================================================
 
+# history tracking
+history = {
+    "theta_norm": [],
+    "theta_phys": [],
+    "objective": []
+}
+
+p_min = np.array([0, 0.2, 40, 0.5, 0.001, 1, 0.01, 0.0001, 0.01])
+p_max = np.array([25, 1, 800, 4, 0.3, 15, 0.02, 0.01, 0.8])
+
+# scale parameters
+def scale(theta):
+    return (theta - p_min) / (p_max - p_min)
+
+def unscale(x):
+    return p_min + x * (p_max - p_min)
+
+
+
+
+bounds = list(zip(p_min, p_max))
+def run_hbv_single(theta, forcing,shape_name):
+    s_0 = np.array([0, 100, 0, 5, 0])  # later: make configurable
+
+    model_output   = run_HBV_model(
+        forcing=forcing,
+        parameter_set=theta,
+        initial_conditions=s_0,
+        show_progress=False,
+        delete_files=True,
+        leave_pbar=False,
+    )
+
+    model_output_m3 = mmday_to_m3s(model_output, shape_name)
+
+    # assume sim is a pd.Series of discharge
+    return model_output_m3
+
+
+def objective(theta_norm, forcing, q_obs, years, shape_name):
+    theta = unscale(theta_norm) 
+    sim = run_hbv_single(theta, forcing, shape_name)
+
+
+    # --- hydrograph fit ---
+    nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
+
+    # --- yearly volume error ---
+    vol_errs = []
+    for y in np.unique(years):
+        mask = years == y
+        sim_y = sim[mask].sum()
+        obs_y = q_obs[mask].sum()
+        vol_errs.append((sim_y - obs_y) / obs_y)
+
+    vol_term = np.mean(np.square(vol_errs))
+
+    # combined objective
+    J = (1 - nse_val) + vol_term
+
+    return float(J)
+
+
+
+# call_counter = {"n": 0}
+# def objective_safe(theta_norm, forcing, q_obs, years, shape_name):
+#     #call_counter["n"] += 1
+#     #print(f"Objective call {call_counter['n']}")
+    
+#     # unscale first
+#     theta = unscale(theta_norm)
+    
+#     sim = run_hbv_single(theta, forcing, shape_name)
+    
+#     nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
+    
+#     # vol_errs = []
+#     # for y in np.unique(years):
+#     #     mask = years == y
+#     #     sim_y = sim[mask].sum()
+#     #     obs_y = q_obs[mask].sum()
+#     #     vol_errs.append((sim_y - obs_y) / obs_y)
+#     # vol_term = np.mean(np.square(vol_errs))
+    
+#     return float(1 - nse_val)   # + vol_term)
+
+call_counter = {"n": 0}
+def objective_safe(theta_norm, forcing, q_obs, years, shape_name):
+    call_counter["n"] += 1
+
+    # unscale for HBV
+    theta_phys = unscale(theta_norm)
+
+    # run HBV
+    sim = run_hbv_single(theta_phys, forcing, shape_name)
+
+    # NSE
+    nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
+    obj_val = float(1 - nse_val)
+
+    # store in history
+    history["theta_norm"].append(theta_norm.copy())
+    history["theta_phys"].append(theta_phys.copy())
+    history["objective"].append(obj_val)
+
+    print(f"Objective call {call_counter['n']} -> NSE={1-obj_val:.3f}")
+    return obj_val
 
     
 
