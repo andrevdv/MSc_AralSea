@@ -9,6 +9,9 @@ from pathlib import Path
 from datetime import datetime
 import numpy as np
 import shutil
+import pandas as pd
+import os
+import json
 
 def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -257,6 +260,19 @@ def run_ensemble_HBV(n_particles: int, forcing, delete_files = True):
 # more text to be added here
 # ===========================================================================
 
+parameter_names = [
+    "Imax",  # 0
+    "Ce",    # 1
+    "Sumax", # 2
+    "Beta",  # 3
+    "Pmax",  # 4
+    "Tlag",  # 5
+    "Kf",    # 6
+    "Ks",    # 7
+    "FM"     # 8
+]
+
+
 # history tracking
 history = {
     "theta_norm": [],
@@ -304,6 +320,7 @@ def objective(theta_norm, forcing, q_obs, years, shape_name):
     # --- hydrograph fit ---
     nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
 
+
     # --- yearly volume error ---
     vol_errs = []
     for y in np.unique(years):
@@ -343,32 +360,116 @@ def objective(theta_norm, forcing, q_obs, years, shape_name):
     
 #     return float(1 - nse_val)   # + vol_term)
 
+def volume_error(sim, obs):
+    return abs(1 - np.sum(sim) / np.sum(obs))
+
+
 call_counter = {"n": 0}
-def objective_safe(theta_norm, forcing, q_obs, years, shape_name):
+
+def objective_safe(theta_norm, forcing, q_obs, shape_name):
+    """
+    Safe objective function for CMA-ES calibration of the HBV model.
+
+    This function unscales the normalized parameter vector, runs the HBV model 
+    for a single catchment, computes hydrological performance metrics 
+    (NSE, KGE, and volume error), and combines them into a weighted objective 
+    function. The function also records the history of parameters and metrics 
+    for analysis.
+
+    Parameters
+    ----------
+    theta_norm : array_like
+        Normalized parameter vector (values in [0,1]) for HBV.
+    forcing : pd.DataFrame or dict
+        Meteorological forcing data (e.g., precipitation, temperature) for the model.
+    q_obs : array_like or pd.Series
+        Observed streamflow time series corresponding to the simulation period.
+    years : array_like
+        List or array of years corresponding to the simulation period.
+    shape_name : str
+        Identifier for the catchment or model configuration to simulate.
+
+    Returns
+    -------
+    float
+        Weighted objective function value:
+            obj_val = 0.3*(1-NSE) + 0.3*(1-KGE) + 0.4*VolumeError
+
+    Notes
+    -----
+    - NSE: Nash-Sutcliffe Efficiency, evaluates hydrograph fit.
+    - KGE: Kling-Gupta Efficiency (2009), evaluates correlation, variability, and bias.
+    - VolumeError: Absolute error in total simulated vs. observed streamflow volume, 
+      important for endorheic basins where long-term water balance is critical.
+    - History of parameters and metrics is stored in the global `history` dictionary.
+    - The global `call_counter` dictionary tracks the number of function evaluations.
+    """
+    
     call_counter["n"] += 1
 
-    # unscale for HBV
+    # Unscale parameters for HBV
     theta_phys = unscale(theta_norm)
 
-    # run HBV
+    # Run HBV
     sim = run_hbv_single(theta_phys, forcing, shape_name)
 
-    # NSE
-    nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
-    obj_val = float(1 - nse_val)
+    # --- Metrics ---
+    nse = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
 
-    # store in history
-    history["theta_norm"].append(theta_norm.copy())
-    history["theta_phys"].append(theta_phys.copy())
-    history["objective"].append(obj_val)
+    r = np.corrcoef(sim, q_obs)[0, 1]
+    alpha = np.std(sim) / np.std(q_obs)
+    beta = np.mean(sim) / np.mean(q_obs)
+    kge = 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)
 
-    #print(f"Objective call {call_counter['n']} -> NSE={1-obj_val:.3f}")
+    vol_err = volume_error(sim, q_obs)
+
+    # --- Combined objective ---
+    obj_val = 0.3 * (1 - nse) + 0.3 * (1 - kge) + 0.4 * vol_err
+
+    # --- Store in history ---
+    history.setdefault("theta_norm", []).append(theta_norm.copy())
+    history.setdefault("theta_phys", []).append(theta_phys.copy())
+    history.setdefault("objective", []).append(obj_val)
+    history.setdefault("nse", []).append(nse)
+    history.setdefault("kge", []).append(kge)
+    history.setdefault("vol_err", []).append(vol_err)
+
     return obj_val
-
     
+def save_history(history, filename, folder="results", fmt="csv"):
+    """
+    Save CMA-ES calibration history to file.
 
+    Parameters
+    ----------
+    history : dict
+        Dictionary containing CMA-ES calibration history.
+        Expected keys: 'theta_norm', 'theta_phys', 'objective', 'nse', 'kge', 'vol_err', ...
+    filename : str
+        Name of the file (without extension) to save.
+    folder : str, optional
+        Folder to save the file in (default is "results"). Created if it does not exist.
+    fmt : str, optional
+        File format: "csv", "json", or "pkl" (default is "csv").
+    """
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, filename + "." + fmt)
 
+    # Convert history to DataFrame if possible
+    df = pd.DataFrame(history)
 
+    if fmt == "csv":
+        df.to_csv(path, index=False)
+    elif fmt == "json":
+        df.to_json(path, orient="records", indent=2)
+    elif fmt == "pkl":
+        df.to_pickle(path)
+    else:
+        raise ValueError("Unsupported format. Choose 'csv', 'json', or 'pkl'.")
+
+    print(f"History saved to {path}")
+
+#TODO: add function for cma-es (note to self: see work document)
 
 
 
