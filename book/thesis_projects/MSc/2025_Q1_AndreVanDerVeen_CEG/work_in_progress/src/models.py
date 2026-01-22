@@ -362,7 +362,7 @@ def objective_safe(theta_norm, forcing, q_obs, years, shape_name):
     history["theta_phys"].append(theta_phys.copy())
     history["objective"].append(obj_val)
 
-    print(f"Objective call {call_counter['n']} -> NSE={1-obj_val:.3f}")
+    #print(f"Objective call {call_counter['n']} -> NSE={1-obj_val:.3f}")
     return obj_val
 
     
