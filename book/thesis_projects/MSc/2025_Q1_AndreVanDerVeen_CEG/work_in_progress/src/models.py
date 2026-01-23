@@ -12,6 +12,7 @@ import shutil
 import pandas as pd
 import os
 import json
+import cma
 
 def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -470,7 +471,75 @@ def save_history(history, filename, folder="results", fmt="csv"):
     print(f"History saved to {path}")
 
 #TODO: add function for cma-es (note to self: see work document)
+def run_cma_ensemble(
+    objective_fn,
+    x0_norm,
+    sigma0,
+    args,
+    p_min,
+    p_max,
+    seeds=[0, 1, 2],
+    popsize=15,
+    maxfevals=500
+):
+    """
+    Run multiple CMA-ES calibrations with different random seeds and collect histories.
 
+    Parameters
+    ----------
+    objective_fn : callable
+        The objective function to minimize.
+    x0_norm : array-like
+        Initial normalized parameter guess.
+    sigma0 : float
+        Initial standard deviation (step size) for CMA-ES.
+    args : tuple
+        Additional arguments to pass to the objective function (forcing, observations, etc.).
+    p_min, p_max : array-like
+        Min and max bounds for parameters (normalized to [0,1]).
+    seeds : list of int
+        List of random seeds for independent runs.
+    popsize : int
+        CMA-ES population size.
+    maxfevals : int
+        Maximum number of function evaluations per run.
+
+    Returns
+    -------
+    results_list : list of dict
+        Each element is a dict with keys 'res' (CMA-ES output) and 'history' (DataFrame of metrics).
+    """
+    results_list = []
+
+    for s in seeds:
+        # reset objective history for each run
+        global history
+        history = {}
+
+        np.random.seed(s)
+        res = cma.fmin(
+            objective_fn,
+            x0_norm,
+            sigma0,
+            args=args,
+            options={
+                'bounds': [np.zeros_like(p_min).tolist(), np.ones_like(p_max).tolist()],
+                'popsize': popsize,
+                'maxfevals': maxfevals,
+                'seed': s
+            }
+        )
+
+        # convert history dict to DataFrame
+        history_df = pd.DataFrame(history)
+
+        results_list.append({
+            'seed': s,
+            'res': res,
+            'history': history_df
+        })
+
+    return results_list
 
 
 
