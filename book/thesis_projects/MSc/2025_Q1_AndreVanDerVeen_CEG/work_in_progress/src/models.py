@@ -2,7 +2,7 @@ from tqdm.notebook import tqdm
 import pandas as pd
 import ewatercycle.models
 from src.paths import OUTPUT_HBV,INI_FILES
-from src.utils import mmday_to_m3s
+from src.utils import mmday_to_m3s,catchment_area_from_shapefile
 import pickle
 import xarray as xr
 from pathlib import Path
@@ -13,6 +13,7 @@ import pandas as pd
 import os
 import json
 import cma
+from functools import lru_cache
 
 def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -60,16 +61,17 @@ def run_HBV_model(forcing, parameter_set, initial_conditions, show_progress=True
         pbar.close()
 
     config_dir = Path(config_dir)
-    #print(f"config_dir = {config_dir}")
-    if config_dir.exists() and config_dir.is_dir() and delete_files==True:
-        #check it only contains HBV_config.json
-        files = list(config_dir.iterdir())
-        if len(files) == 1 and files[0].name == "HBV_config.json":
-            shutil.rmtree(config_dir)
-        else:
-            print(f"Folder {config_dir} not deleted: contains other files")
 
-    # Finalize model (shuts down container)
+    if delete_files:
+        try:
+            if config_dir.exists() and config_dir.is_dir():
+                files = list(config_dir.iterdir())
+                if len(files) == 1 and files[0].name == "HBV_config.json":
+                    shutil.rmtree(config_dir)
+                else:
+                    print(f"Folder {config_dir} not deleted: contains other files")
+        except Exception as e:
+            print(f"Could not delete folder {config_dir}: {e}")
     model.finalize()
 
 
@@ -367,7 +369,7 @@ def volume_error(sim, obs):
 
 call_counter = {"n": 0}
 
-def objective_safe(theta_norm, forcing, q_obs, shape_name):
+def objective_safe(theta_norm, forcing, q_obs, shape_name, history):
     """
     Safe objective function for CMA-ES calibration of the HBV model.
 
@@ -405,7 +407,6 @@ def objective_safe(theta_norm, forcing, q_obs, shape_name):
     - History of parameters and metrics is stored in the global `history` dictionary.
     - The global `call_counter` dictionary tracks the number of function evaluations.
     """
-    
     call_counter["n"] += 1
 
     # Unscale parameters for HBV
@@ -541,9 +542,59 @@ def run_cma_ensemble(
 
     return results_list
 
+def run_cma(
+    cma_seed,
+    x0_norm,
+    sigma0,
+    objective_fn,
+    popsize,
+    maxfevals,
+    bounds=(0.0, 1.0),
+    save_folder=None,
+):
+    import cma
+    import pickle
+    local_history = {}
 
+    # Wrap the objective to use this local history
+    def objective_wrapped(theta_norm):
+        return objective_fn(theta_norm, local_history)
 
+    es = cma.CMAEvolutionStrategy(
+        x0_norm,
+        sigma0,
+        {
+            "seed": cma_seed,
+            "popsize": popsize,
+            "maxfevals": maxfevals,
+            "bounds": bounds,
+        }
+    )
 
+    es.optimize(objective_wrapped)
+
+    result = {
+        "seed": cma_seed,
+        "best_f": es.best.f,
+        "best_x": es.best.x,
+        "nfev": es.countevals,
+        "sigma_final": es.sigma,
+        "history": local_history.copy()
+    }
+
+    # Save result if folder is provided
+    if save_folder is not None:
+        save_folder = Path(save_folder)
+        save_folder.mkdir(parents=True, exist_ok=True)
+        file_path = save_folder / f"result_seed_{cma_seed}.pkl"
+        with open(file_path, "wb") as f:
+            pickle.dump(result, f)
+    return result
+
+def make_objective_safe(forcing, q_obs, shape_name):
+    def objective(theta_norm, history):
+        return objective_safe(theta_norm, forcing, q_obs, shape_name, history)
+    return objective
 
 
 

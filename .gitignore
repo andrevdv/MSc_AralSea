@@ -164,6 +164,8 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/Images_etc
 /**/GRDC*/
 /**/outcmaes/
 
+result_seed_*.pkl
+
 
 # testing some git ignore magic
 #ignore everthing in this folder

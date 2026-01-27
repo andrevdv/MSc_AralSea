@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 import pandas as pd
+from functools import lru_cache
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
@@ -61,12 +62,20 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
         Discharge converted to m³/s
     """
     # Compute catchment area in m²
-    area_m2 = catchment_area_from_shapefile(shape_name)  # default returns m²
+    area_m2 = _get_catchment_area(shape_name)  # default returns m²
     # Conversion: 1 mm/day over 1 m² = 1e-3 m³/day
     # Then divide by 86400 s/day to get m³/s
     conversion_factor = 1e-3 / 86400 * area_m2
     model_output_m3s = model_output * conversion_factor
     return model_output_m3s
+
+
+@lru_cache(maxsize=None)
+def _get_catchment_area(shape_name: str) -> float:
+    return catchment_area_from_shapefile(shape_name)
+
+
+
 
 def get_integer_multiple_bounds(
     shapefiles: Union[str, Path, Sequence[Union[str, Path]]],
