@@ -136,7 +136,7 @@ class LakeGeometry:
         return fig, axes
     
 class River:
-    def __init__(self, df, q_col, name=None, factor=86400/1e9):
+    def __init__(self, df, q_col, name=None, factor:float=86400/1e9, scaling:float=1):
         """
         Wraps a river discharge time series for the lake model.
 
@@ -153,7 +153,7 @@ class River:
         """
         self.name = name
         self.Q_raw = df[q_col]       # original m³/s
-        self.Q = self.Q_raw * factor # km³/day
+        self.Q = self.Q_raw * factor * scaling # km³/day
 
     def plot_yearly(self):
         """
@@ -254,7 +254,9 @@ def run_connected_aral_model(
     aral_meteo,
     rivers,      # list of River objects, e.g., [River_Amu_Darya, River_Syr_Darya]
     ahv_csv,
-    V0_km3
+    V0_km3,
+    start_time=None,  # optional: datetime-like string or pd.Timestamp
+    end_time=None     # optional: datetime-like string or pd.Timestamp
 ):
     """
     Connected Aral Sea daily water balance model.
@@ -275,7 +277,22 @@ def run_connected_aral_model(
     pandas.DataFrame
         Columns: time, volume_km3, area_km2, elevation_m
     """
+
+        # --- Slice meteorological forcing ---
+    if start_time is not None or end_time is not None:
+        aral_meteo = aral_meteo.sel(
+            time=slice(start_time, end_time)
+        )
+
+    # --- Slice river time series ---
+    for r in rivers:
+        if start_time is not None or end_time is not None:
+            mask = (r.Q_raw.index >= pd.to_datetime(start_time)) & \
+                   (r.Q_raw.index <= pd.to_datetime(end_time))
+            r.Q = r.Q_raw.loc[mask] * (r.Q / r.Q_raw).iloc[0]  # keeps factor/scaling applied
+
     n = min(len(aral_meteo.time), min(len(r.Q) for r in rivers))
+
 
     V = pd.Series(index=range(n), dtype=float)
     A = pd.Series(index=range(n), dtype=float)
@@ -374,3 +391,91 @@ def plot_aral_results(df):
 
     plt.tight_layout()
     plt.show()
+
+def plot_aral_fluxes(df):
+    """
+    Plot yearly inflow and evaporation for the Aral Sea simulation.
+
+    Creates two side-by-side subplots with the same y-axis scale.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing simulation results with columns:
+        - 'time' : datetime-like
+        - 'Q_in_km3day' : daily inflow in km³/day
+        - 'evap_km3day' : daily evaporation in km³/day
+
+    Returns
+    -------
+    None
+    """
+    # Resample to yearly totals
+    df_yearly = df.set_index("time").resample("Y").sum()
+
+    # Determine shared y-axis limit
+    y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())
+
+    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+
+    # Yearly inflow
+    axs[0].bar(df_yearly.index.year, df_yearly["Q_in_km3day"], color='skyblue')
+    axs[0].set_title("Yearly River Inflow")
+    axs[0].set_xlabel("Year")
+    axs[0].set_ylabel("Inflow (km³/yr)")
+    axs[0].set_ylim(0, y_max)
+    axs[0].grid(True)
+
+    # Yearly evaporation
+    axs[1].bar(df_yearly.index.year, df_yearly["evap_km3day"], color='salmon')
+    axs[1].set_title("Yearly Evaporation")
+    axs[1].set_xlabel("Year")
+    axs[1].set_ylabel("Evaporation (km³/yr)")
+    axs[1].set_ylim(0, y_max)
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
+    """
+    Save Aral Sea simulation results in CSV, pickle, and NetCDF formats.
+
+    Parameters
+    ----------
+    aral_df : pandas.DataFrame
+        Simulation results containing a 'time' column.
+    save_dir : str or Path
+        Directory where files will be saved.
+    prefix : str, default "aral_sim"
+        Prefix for the saved files.
+
+    Returns
+    -------
+    dict
+        Paths of the saved files.
+    """
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    paths = {}
+
+    # CSV
+    csv_path = save_dir / f"{prefix}.csv"
+    aral_df.to_csv(csv_path, index=False)
+    paths["csv"] = csv_path
+
+    # Pickle
+    pkl_path = save_dir / f"{prefix}.pkl"
+    aral_df.to_pickle(pkl_path)
+    paths["pkl"] = pkl_path
+
+    # NetCDF via xarray
+    nc_path = save_dir / f"{prefix}.nc"
+    # Convert DataFrame to xarray
+    ds = aral_df.set_index("time").to_xarray()
+    ds.to_netcdf(nc_path)
+    paths["nc"] = nc_path
+
+    return paths
+

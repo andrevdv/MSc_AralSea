@@ -694,9 +694,43 @@ def generate_koppen_tables(
         with open(save_tex, "w") as f:
             f.write(latex_table)
 
-    # Save Markdown
+        # --- Save Markdown ---
     if save_md:
-        markdown_table = top_df.to_markdown(index=True)
+        top_df = top_df.reset_index()  # move index into a column
+        top_df.rename(columns={"index": "Climate code"}, inplace=True)
+
+        # Identify numeric columns and round
+        numeric_cols = top_df.select_dtypes(include="number").columns
+        top_df[numeric_cols] = top_df[numeric_cols].round(2)  # 2 decimal places
+
+        # --- Add (%) to numeric column headers ---
+        new_columns = []
+        for col in top_df.columns:
+            if col in numeric_cols:
+                new_columns.append(f"{col} (%)")
+            else:
+                new_columns.append(col)
+        top_df.columns = new_columns
+
+        try:
+            # Use tabulate/pandas Markdown export if available
+            markdown_table = top_df.to_markdown(
+                index=False,
+                tablefmt="pipe",
+                numalign="right",  # right-align numeric columns
+            )
+        except ImportError:
+            # Fallback if tabulate is missing
+            header = "| " + " | ".join(top_df.columns) + " |"
+            # Right-align numeric columns using :---:
+            separator = "| " + " | ".join(
+                "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---" 
+                for col in top_df.columns
+            ) + " |"
+            rows = ["| " + " | ".join(map(str, row)) + " |" for row in top_df.values]
+            markdown_table = "\n".join([header, separator] + rows)
+
+        # Save to file
         with open(save_md, "w", encoding="utf-8") as f:
             f.write(markdown_table)
 

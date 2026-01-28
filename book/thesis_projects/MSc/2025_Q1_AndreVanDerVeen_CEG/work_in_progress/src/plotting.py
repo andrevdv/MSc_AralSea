@@ -716,8 +716,8 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
         top_df = generate_koppen_tables(
             df_percent,
             koppen_description=koppen_description,
-            save_tex=analysis_dir / f"koppen_table_{suffix}.tex",
-            save_md=None,
+            save_tex=tex_file,
+            save_md=md_file,
             caption=caption,
             label=label,
             
