@@ -7,10 +7,10 @@ from pathlib import Path
 # Numerical / plotting
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import matplotlib.patheffects as pe
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+import matplotlib.patheffects as pe
 
 # Geospatial
 import fiona
@@ -20,12 +20,13 @@ import rasterio
 # Cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from cartopy.io.shapereader import Reader
 from cartopy.feature import ShapelyFeature, BORDERS, LAKES, RIVERS, COASTLINE, OCEAN
+from cartopy.io.shapereader import Reader
 
 # Local modules
-from src.utils import get_integer_multiple_bounds
 from src.paths import SHAPEFILES
+from src.utils import compute_koppen_class_counts, generate_koppen_tables, get_integer_multiple_bounds, get_combined_extent, KOPPEN_DESCRIPTION,extract_scenario_and_year
+
 
 def plot_shapefile_overview(
     shapefile,
@@ -466,9 +467,260 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
         return None
 
 
+def plot_koppen_geiger_map(path_to_file, shapefiles=None,
+                           show_plot=True, show_legend=True,
+                           show_title=True, savefig=False, save_dir=None,
+                           class_names=None, rgb_colors=None, extent=None, filename=None, title=None):
+    """
+    Plot Köppen-Geiger raster map with optional shapefiles.
+    Returns fig, ax.
+    """
+    path_to_file = Path(path_to_file)
+
+    # Compute extent if not provided
+    if extent is None and shapefiles:
+        extent = get_combined_extent(shapefiles, padding=1.0)
+    elif extent is None:
+        # fallback extent
+        extent = (54, 33, 82, 53)
+    lon_min, lat_min, lon_max, lat_max = extent
+
+    # --- Load raster ---
+    import rasterio
+    with rasterio.open(path_to_file) as src:
+        data = src.read(1)
 
 
+    # --- Defaults ---
+    class_names = class_names or [
+        "Af","Am","Aw","BWh","BWk","BSh","BSk","Csa","Csb","Csc",
+        "Cwa","Cwb","Cwc","Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
+        "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd","ET","EF"
+    ]
+    if rgb_colors is None:
+        rgb_colors = np.array([
+            [0, 0, 255], [0, 120, 255], [70, 170, 250], [255, 0, 0], [255, 150, 150],
+            [245, 165, 0], [255, 220, 100], [255, 255, 0], [200, 200, 0], [150, 150, 0],
+            [150, 255, 150], [100, 200, 100], [50, 150, 50], [200, 255, 80], [100, 255, 80],
+            [50, 200, 0], [255, 0, 255], [200, 0, 200], [150, 50, 150], [150, 100, 150],
+            [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
+            [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
+        ], dtype=float)/255
+    
+    cmap = ListedColormap(np.array(rgb_colors))
+    norm = BoundaryNorm(np.arange(0.5, len(class_names)+0.5, 1), cmap.N)
 
+    # --- Figure ---
+    fig = plt.figure(figsize=(10,10), dpi=300)
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    ax.imshow(data, cmap=cmap, norm=norm, origin="upper",
+              extent=[-180, 180, -90, 90], transform=ccrs.PlateCarree())
+
+    # --- Features ---
+    ax.add_feature(COASTLINE)
+    ax.add_feature(BORDERS, linestyle=":")
+    ax.add_feature(LAKES, facecolor="lightblue", edgecolor="blue")
+    ax.add_feature(RIVERS, edgecolor="blue")
+    ax.add_feature(OCEAN, facecolor="blue")
+
+    # --- Shapefiles ---
+    legend_handles = [Patch(facecolor=rgb_colors[i], edgecolor="k", label=f"{i+1}: {name}")
+                  for i, name in enumerate(class_names)]
+
+    if shapefiles:
+        for label, cfg in shapefiles.items():
+            # Load shapefile geometries with fiona
+            with fiona.open(cfg["path"]) as src:
+                geoms = [shape(feat["geometry"]) for feat in src]
+
+            # Create Cartopy feature
+            feature = ShapelyFeature(
+                geoms,
+                ccrs.PlateCarree(),
+                facecolor="none",
+                edgecolor=cfg.get("edgecolor", "black"),
+                linewidth=cfg.get("linewidth", 1),
+                linestyle=cfg.get("linestyle", "-")
+            )
+            ax.add_feature(feature)
+
+            # Add to legend
+            legend_handles.append(
+                Line2D(
+                    [0], [0],
+                    color=cfg.get("edgecolor", "black"),
+                    linewidth=2,
+                    label=label,
+                    linestyle=cfg.get("linestyle", "-")
+                )
+            )
+
+    if show_legend:
+        ax.legend(handles=legend_handles, bbox_to_anchor=(1.05,1), loc="upper left", fontsize=8)
+
+    if show_title:
+        if title is None:
+            ax.set_title(f"Köppen-Geiger Map ({path_to_file.stem})", fontsize=14)
+        else:
+            ax.set_title(title, fontsize=14)
+
+    plt.tight_layout()
+
+    if savefig:
+        fname = filename or f"{path_to_file.stem}.png"
+        save_path = Path(save_dir or ".") / fname 
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    if show_plot:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
+                           show_plot=True, save_dir=None, prefix=""):
+    """
+    Plot percentage bar charts for map and shapefiles.
+    """
+    class_names = class_names or df_percent.index.tolist()
+    rgb_colors = np.array([
+        [0, 0, 255], [0, 120, 255], [70, 170, 250], [255, 0, 0], [255, 150, 150],
+        [245, 165, 0], [255, 220, 100], [255, 255, 0], [200, 200, 0], [150, 150, 0],
+        [150, 255, 150], [100, 200, 100], [50, 150, 50], [200, 255, 80], [100, 255, 80],
+        [50, 200, 0], [255, 0, 255], [200, 0, 200], [150, 50, 150], [150, 100, 150],
+        [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
+        [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
+    ])/255
+
+    def counts_to_percent(counts):
+        total = np.sum(counts)
+        if total == 0:
+            return np.zeros_like(counts, dtype=float)
+        return [c/total*100 for c in counts]
+
+    # Map extent (first column)
+    map_col = df_percent.columns[0]
+    plt.figure(figsize=(12,4))
+    plt.bar(class_names, counts_to_percent(df_percent[map_col]), color=rgb_colors)
+    plt.xticks(rotation=90)
+    plt.ylabel("Percentage (%)")
+    plt.title(f"Köppen-Geiger Class Distribution ({map_col})")
+    plt.grid(axis="y", linestyle="--", alpha=0.5)
+    if save_dir:
+        plt.savefig(Path(save_dir)/f"{map_col}_hist.png", dpi=300, bbox_inches="tight")
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
+
+    # Remaining columns (shapefiles)
+    for col in df_percent.columns[1:]:
+        plt.figure(figsize=(12,4))
+        plt.bar(class_names, counts_to_percent(df_percent[col]), color=rgb_colors)
+        plt.xticks(rotation=90)
+        plt.ylabel("Percentage (%)")
+        plt.title(f"Köppen-Geiger Class Distribution ({col})")
+        plt.grid(axis="y", linestyle="--", alpha=0.5)
+        if save_dir:
+            plt.savefig(Path(save_dir) / f"koppen_hist_{prefix}_{col}.png", dpi=300, bbox_inches="tight")
+        if show_plot:
+            plt.show()
+        else:
+            plt.close()
+
+def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None,
+                          plot_map=True, plot_hist=True, generate_table=True,
+                          save_dir=None, show_plot=False):
+    """
+    High-level wrapper: compute counts, plot raster map, histograms, and generate tables.
+
+    Returns
+    -------
+    fig, ax : matplotlib objects (or None)
+    df_percent : DataFrame of class percentages
+    top_df : processed top-N DataFrame
+    """
+    # --- Compute extent once ---
+    extent = get_combined_extent(shapefiles) if shapefiles else None
+
+    # --- Compute counts ---
+    df_counts, df_percent = compute_koppen_class_counts(path_to_file, shapefiles=shapefiles, extent=extent)
+
+    fig, ax = (None, None)
+    top_df = None
+
+    # extract range and scenario from file path
+    year_range, scenario = extract_scenario_and_year(path_to_file)
+    year_range_str = year_range.replace("_", "-")
+    title = f"Köppen-Geiger Map ({year_range_str}"
+    if scenario:
+        title += f", {scenario}"
+    title += ")"
+
+    suffix = f"{year_range}"
+    if scenario:
+        suffix += f"_{scenario}"
+
+    caption = (
+        "Percentage coverage of dominant Köppen-Geiger climate classes "
+        f"({year_range_str}"
+    )
+    if scenario:
+        caption += f", {scenario}"
+    caption += ")"
+
+    label = f"tab:koppen_geiger_{year_range}"
+    if scenario:
+        label += f"_{scenario}"
+
+    save_dir = Path(save_dir or ".")
+    analysis_dir = Path(save_dir or ".") / suffix
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+
+
+    map_file = analysis_dir  / f"koppen_map_{suffix}.png"
+    hist_file = analysis_dir  / f"koppen_hist_{suffix}.png"
+    tex_file = analysis_dir  / f"koppen_table_{suffix}.tex"
+    md_file = analysis_dir  / f"koppen_table_{suffix}.md"
+
+
+    # --- Map ---
+    if plot_map:
+        fig, ax = plot_koppen_geiger_map(
+            path_to_file,
+            shapefiles=shapefiles,
+            extent=extent,
+            title=title,
+            savefig=True,
+            save_dir=analysis_dir,
+            filename=f"koppen_map_{suffix}.png",
+            show_plot=show_plot,
+        )
+    # --- Histograms ---
+    if plot_hist:
+        plot_koppen_histograms(
+            df_percent,
+            shapefiles=shapefiles,
+            save_dir=analysis_dir,
+            prefix=suffix,
+            show_plot=show_plot
+        )
+
+    # --- Table ---
+    if generate_table:
+        top_df = generate_koppen_tables(
+            df_percent,
+            koppen_description=koppen_description,
+            save_tex=analysis_dir / f"koppen_table_{suffix}.tex",
+            save_md=None,
+            caption=caption,
+            label=label,
+            
+        )
+
+    return fig, ax, df_percent, top_df
 
 
 

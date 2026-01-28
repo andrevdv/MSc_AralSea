@@ -9,6 +9,7 @@ within the eWaterCycle framework. Includes functions for:
 """
 import configparser
 import re
+from collections import Counter
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -17,10 +18,15 @@ from typing import Sequence, Union
 import fiona
 import numpy as np
 import pandas as pd
+import rasterio
+import rasterio.mask
 from pyproj import Geod
-from shapely.geometry import box, shape
+from shapely.geometry import box, mapping, shape
 
 from src.paths import *
+
+
+
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
     Compute the area (in m²) of the first polygon in a shapefile.
@@ -507,3 +513,232 @@ def build_grdc_metadata_table(
             )
 
     return df
+
+KOPPEN_DESCRIPTION = {
+    "Af": "Tropical rainforest",
+    "Am": "Tropical monsoon",
+    "Aw": "Tropical savanna",
+    "BWh": "Hot desert",
+    "BWk": "Cold desert",
+    "BSh": "Hot steppe",
+    "BSk": "Cold steppe",
+    "Csa": "Mediterranean, hot summer",
+    "Csb": "Mediterranean, warm summer",
+    "Csc": "Mediterranean, cold summer",
+    "Cwa": "Temperate, dry winter, hot summer",
+    "Cwb": "Temperate, dry winter, warm summer",
+    "Cwc": "Temperate, dry winter, cold summer",
+    "Cfa": "Temperate, no dry season, hot summer",
+    "Cfb": "Temperate, no dry season, warm summer",
+    "Cfc": "Temperate, no dry season, cold summer",
+    "Dsa": "Snow, dry summer, hot summer",
+    "Dsb": "Snow, dry summer, warm summer",
+    "Dsc": "Snow, dry summer, cold summer",
+    "Dsd": "Snow, dry summer, very cold summer",
+    "Dwa": "Snow, dry winter, hot summer",
+    "Dwb": "Snow, dry winter, warm summer",
+    "Dwc": "Snow, dry winter, cold summer",
+    "Dwd": "Snow, dry winter, very cold winter",
+    "Dfa": "Snow, no dry season, hot summer",
+    "Dfb": "Snow, no dry season, warm summer",
+    "Dfc": "Snow, no dry season, cold summer",
+    "Dfd": "Snow, no dry season, very cold winter",
+    "ET": "Tundra",
+    "EF": "Ice cap"
+}
+
+
+
+
+def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None, extent=None):
+    """
+    Compute pixel counts for Köppen-Geiger classes for raster and optional shapefiles.
+
+    Parameters
+    ----------
+    path_to_file : str or Path
+        Path to Köppen-Geiger raster.
+    shapefiles : dict, optional
+        Dictionary of shapefile configurations:
+            {"Label": {"path": Path(...), "edgecolor": "...", "linewidth": ...}}
+    class_names : list of str, optional
+        List of Köppen class names. Defaults to 30 standard classes.
+
+    Returns
+    -------
+    df_counts : pandas.DataFrame
+        Raw counts for raster and shapefiles.
+    df_percent : pandas.DataFrame
+        Percent coverage of each class.
+    """
+    path_to_file = Path(path_to_file)
+    class_names = class_names or [
+        "Af","Am","Aw","BWh","BWk","BSh","BSk","Csa","Csb","Csc",
+        "Cwa","Cwb","Cwc","Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
+        "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd","ET","EF"
+    ]
+
+    with rasterio.open(path_to_file) as src:
+        nodata = src.nodata  # ALWAYS get nodata
+
+        data = src.read(1)
+
+        if extent is not None:
+            lon_min, lat_min, lon_max, lat_max = extent
+            # Convert lon/lat to row/col indices
+            row_start, col_start = src.index(lon_min, lat_max)  # upper-left
+            row_stop, col_stop = src.index(lon_max, lat_min)    # lower-right
+
+            # Ensure indices are within raster bounds
+            row_start = max(0, row_start)
+            row_stop = min(src.height, row_stop)
+            col_start = max(0, col_start)
+            col_stop = min(src.width, col_stop)
+
+            # Slice the array
+            data = data[row_start:row_stop, col_start:col_stop]
+    flat_data = data.flatten()
+    if nodata is not None:
+        flat_data = flat_data[flat_data != nodata]
+
+    df_counts = pd.DataFrame(index=class_names)
+    df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+
+    # --- Shapefile counts ---
+    if shapefiles:
+        for label, cfg in shapefiles.items():
+            with fiona.open(cfg["path"]) as shp:
+                geoms = [shape(feat["geometry"]) for feat in shp]  # list of Shapely geometries
+
+            with rasterio.open(path_to_file) as src:
+                masked, _ = rasterio.mask.mask(src, geoms, crop=True)
+
+            masked_flat = masked[0].flatten()
+            if nodata is not None:
+                masked_flat = masked_flat[masked_flat != nodata]
+
+            df_counts[label] = [np.sum(masked_flat == i+1) for i in range(len(class_names))]
+    # --- Percentages ---
+    df_percent = df_counts.div(df_counts.sum(axis=0), axis=1) * 100
+
+    return df_counts, df_percent
+
+def generate_koppen_tables(
+        df_percent,
+        koppen_description=None,
+        top_n=10,
+        save_tex=None,
+        save_md=None,
+        caption=None,
+        label=None,
+    ):
+    """
+    Produce top-N class table with 'Other', optionally save as LaTeX / Markdown.
+
+    Parameters
+    ----------
+    df_percent : pandas.DataFrame
+        Percent coverage for classes.
+    koppen_description : dict, optional
+        Mapping class_name -> description
+    top_n : int, default 10
+        Number of top classes to keep, others grouped as "Other".
+    save_tex : str or Path, optional
+        Path to save LaTeX table.
+    save_md : str or Path, optional
+        Path to save Markdown table.
+
+    Returns
+    -------
+    top_df : pandas.DataFrame
+        Processed top-N table with percentages.
+    """
+    df_subset = df_percent.drop(columns=["total_raster"], errors="ignore")
+    df_sorted = df_subset.sort_values(df_subset.columns[0], ascending=False)  # sort by first column
+    top_df = df_sorted.head(top_n)
+    other = df_sorted.iloc[top_n:].sum()
+    other.name = "Other"
+    top_df = pd.concat([top_df, other.to_frame().T])
+
+    top_df = top_df.copy()
+
+    # Add descriptions
+    if koppen_description:
+        top_df.insert(
+            0,
+            "Climate description",
+            [koppen_description.get(idx, "Other classes") for idx in top_df.index]
+        )
+
+    # Save LaTeX
+    if save_tex:
+        latex_table = top_df.to_latex(
+            float_format="%.1f",
+            index=True,
+            caption=caption or
+                "Percentage coverage of dominant Köppen-Geiger climate classes",
+            label=label or "tab:koppen_geiger_percent",
+            column_format="ll" + "r"*len(top_df.columns[1:]),
+            bold_rows=True,
+            escape=False
+        )
+        with open(save_tex, "w") as f:
+            f.write(latex_table)
+
+    # Save Markdown
+    if save_md:
+        markdown_table = top_df.to_markdown(index=True)
+        with open(save_md, "w", encoding="utf-8") as f:
+            f.write(markdown_table)
+
+    return top_df
+
+def get_combined_extent(shapefiles, padding=1.0):
+    """
+    Return combined lon/lat bounds of multiple shapefiles with optional padding.
+    
+    Parameters
+    ----------
+    shapefiles : dict
+        {"label": {"path": Path, ...}, ...}
+    padding : float
+        Degrees to extend bounds
+    
+    Returns
+    -------
+    lon_min, lat_min, lon_max, lat_max : float
+    """
+    if not shapefiles:
+        # fallback extent
+        return 54, 33, 82, 53
+    
+    lon_min, lat_min = float("inf"), float("inf")
+    lon_max, lat_max = float("-inf"), float("-inf")
+    
+    for cfg in shapefiles.values():
+        with fiona.open(cfg["path"]) as src:
+            for feat in src:
+                geom = shape(feat["geometry"])
+                bx, by, Bx, By = geom.bounds
+                lon_min = min(lon_min, bx)
+                lat_min = min(lat_min, by)
+                lon_max = max(lon_max, Bx)
+                lat_max = max(lat_max, By)
+    
+    return lon_min - padding, lat_min - padding, lon_max + padding, lat_max + padding
+
+
+def extract_scenario_and_year(path):
+    """
+    Extract year range and scenario (if any) from raster path.
+    """
+    parts = Path(path).parts
+    # Year folder is assumed to be immediately under KOPPEN_GEIGER
+    try:
+        year_range = next(p for p in parts if re.match(r"\d{4}_\d{4}", p))
+    except StopIteration:
+        year_range = "unknown_year"
+    # Scenario is next folder after year_range (if exists)
+    year_index = parts.index(year_range)
+    scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
+    return year_range, scenario
