@@ -1,20 +1,26 @@
-#empty for now
-import fiona
-import shapely.geometry
-from pyproj import Geod
-from src.paths import *
-import pandas as pd
-from typing import Union, Sequence
-import numpy as np
-import fiona
-from shapely.geometry import shape, box
-import configparser
-from datetime import datetime
-from pathlib import Path
-import re
-import pandas as pd
-from functools import lru_cache
+"""
+Utility functions for hydrological modeling and geospatial data processing
+within the eWaterCycle framework. Includes functions for:
 
+- Catchment area calculation
+- Unit conversion
+- INI file comparison
+- GRDC metadata table generation
+"""
+import configparser
+import re
+from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
+from typing import Sequence, Union
+
+import fiona
+import numpy as np
+import pandas as pd
+from pyproj import Geod
+from shapely.geometry import box, shape
+
+from src.paths import *
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """
     Compute the area (in m²) of the first polygon in a shapefile.
@@ -35,7 +41,7 @@ def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
     with fiona.open(shapefile) as src:
-        poly = shapely.geometry.shape(src[0]["geometry"])
+        poly = shape(src[0]["geometry"])
 
     # Define ellipsoid
     geod = Geod(ellps=ellps)
@@ -365,7 +371,7 @@ def _sanitize_latex(value):
 
 def _sanitize_dataframe_for_latex(df: pd.DataFrame) -> pd.DataFrame:
     """Apply LaTeX sanitization to all string entries in the DataFrame."""
-    return df.applymap(_sanitize_latex)
+    return df.map(_sanitize_latex)
 
 def _export_to_latex(
     df: pd.DataFrame,

@@ -1,11 +1,23 @@
+"""
+Climate forcing data generation and processing.
+
+This module handles the preparation of meteorological forcing data for
+hydrological models within the eWaterCycle framework. It supports:
+- ERA5 reanalysis (observations)
+- CMIP6 historical and future scenarios
+- Both lumped (catchment-average) and gridded formats
+- Bias correction and regridding
+"""
+
 from pathlib import Path
-from src.paths import *
-from src.utils import get_integer_multiple_bounds
+
 import ewatercycle.forcing
 import matplotlib.pyplot as plt
 import xarray as xr
 import xesmf as xe
 
+from src.paths import *
+from src.utils import get_integer_multiple_bounds
 
 # ===========================================================================
 # FORCING GENERATION (LUMPED)

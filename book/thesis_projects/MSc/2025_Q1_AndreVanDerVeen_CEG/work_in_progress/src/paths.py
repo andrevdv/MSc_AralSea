@@ -1,3 +1,6 @@
+"""
+Module defining paths used throughout the project.
+"""
 from pathlib import Path
 
 # ------------------------------
@@ -19,11 +22,13 @@ KOPPEN_GEIGER = DATA / "koppen_geiger_tif"
 # ------------------------------
 FORCING_FOLDER = ROOT / "forcing"
 FORCING_OUTPUT = FORCING_FOLDER / "output"
+
 FORCING_ERA5 = FORCING_OUTPUT / "ERA5"
 FORCING_CMIP_HIST = FORCING_OUTPUT / "CMIP_HIST"
 FORCING_CMIP_FUT = FORCING_OUTPUT / "CMIP_FUT"
 FORCING_PCRGLOB = FORCING_OUTPUT / "PCRGLOBWB"
 
+PCR_GLOBAL_PARAMS = Path("/data/shared/parameter-sets/pcrglobwb_global")
 # ------------------------------
 # Outputs
 # ------------------------------
@@ -52,5 +57,5 @@ RUNS_PCR = MODEL_RUNS / "pcrglobwb"
 INI_FILES = RUNS_PCR / "ini_files"
 INI_COMPARISON = INI_FILES / "comparison_files"
 
-PCR_TAIL = "work/diagnostic/script"
-LOAD_PCR = "ERA5_1940-1960/AralSea_basin"
+PCR_TAIL = Path("work/diagnostic/script")
+LOAD_PCR = Path("ERA5_1940-1960/AralSea_basin")

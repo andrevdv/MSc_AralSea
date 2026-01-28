@@ -1,3 +1,6 @@
+"""
+module for plotting functions related to geospatial data and hydrological modeling. Used in thesis project. Might be extended later.
+"""
 # Standard library
 from pathlib import Path
 
@@ -33,7 +36,7 @@ def plot_shapefile_overview(
 ):
     """
     Plot a simple overview map of a shapefile (context / locator map).
-    automaticcaly extents to integer bounds as used in pcr glob modelling
+    automatically extents to integer bounds as used in PCR-GLOBWB2 modelling
 
     Parameters
     ----------
@@ -107,12 +110,9 @@ def plot_shapefile_overview(
     gl.right_labels = False
 
     # Title
-    if title is not None:
-        ax.set_title(title)
     if title is None:
         stem = Path(shapefile).stem
         title = f"Shapefile overview: {stem}.shp"
-
     ax.set_title(title)
 
     return fig, ax

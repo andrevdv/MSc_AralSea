@@ -1,19 +1,27 @@
-from tqdm.notebook import tqdm
-import pandas as pd
-import ewatercycle.models
-from src.paths import OUTPUT_HBV,INI_FILES
-from src.utils import mmday_to_m3s,catchment_area_from_shapefile
-import pickle
-import xarray as xr
-from pathlib import Path
-from datetime import datetime
-import numpy as np
-import shutil
-import pandas as pd
-import os
+"""
+Module for hydrological model simulations and calibration.
+Includes functions to run HBV and PCR-GLOBWB models,
+generate parameters, run ensembles, and perform CMA-ES calibration.
+"""
+
 import json
-import cma
+import os
+import pickle
+import shutil
+from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
+
+import cma
+import ewatercycle.models
+import numpy as np
+import pandas as pd
+import xarray as xr
+from tqdm.notebook import tqdm
+
+from src.paths import INI_FILES, OUTPUT_HBV
+from src.utils import catchment_area_from_shapefile, mmday_to_m3s
+from src.paths import PCR_GLOBAL_PARAMS
 
 def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -204,7 +212,7 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
 
 
     # can be hardcoded, location of all the pcr-glob data on ewatercycle
-    pcr_glob_directory = Path("/data/shared/parameter-sets/pcrglobwb_global")
+    pcr_glob_directory = PCR_GLOBAL_PARAMS
     
 
     forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].load(
