@@ -1,25 +1,28 @@
-#empty for now
-import fiona
-from shapely.geometry import shape
-from src.utils import get_integer_multiple_bounds
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
+# Standard library
 from pathlib import Path
+
+# Numerical / plotting
 import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.patheffects as pe
-import cmocean
-import rasterio
-import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.patches import Patch
-from matplotlib.lines import Line2D
+
+# Geospatial
+import fiona
+from shapely.geometry import shape
+import rasterio
+
+# Cartopy
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 from cartopy.io.shapereader import Reader
 from cartopy.feature import ShapelyFeature, BORDERS, LAKES, RIVERS, COASTLINE, OCEAN
-from src.paths import  SHAPEFILES
+
+# Local modules
+from src.utils import get_integer_multiple_bounds
+from src.paths import SHAPEFILES
 
 def plot_shapefile_overview(
     shapefile,
@@ -305,7 +308,31 @@ def plot_dem_map(
 ## make koppen-geiger figure
 def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=True, show_plot=True, show_title=True):
     """
-    Docstring for plot_koppen_geiger
+    Plot Köppen-Geiger climate zones from a raster file.
+
+    Parameters
+    ----------
+    path_to_file : str or Path
+        Path to the Köppen-Geiger raster file.
+    savefig : bool, default False
+        If True, save the figure to disk.
+    save_dir : str or Path, optional
+        Directory to save the figure if savefig is True. Defaults to current directory.
+    show_legend : bool, default True
+        Display the legend on the plot.
+    show_plot : bool, default True
+        Display the plot interactively.
+    show_title : bool, default True
+        Display the default title on the plot.
+
+    Returns
+    -------
+    None
+        Figure is displayed or saved to disk depending on parameters.
+
+    Notes
+    -----
+    If both savefig=False and show_plot=False, no figure is output.
     """
     path_to_file = Path(path_to_file)  # <-- make sure this is here
     parts = path_to_file.parts          # <-- now parts is defined

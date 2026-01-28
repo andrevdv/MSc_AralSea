@@ -47,19 +47,23 @@ def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
 
 def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
     """
-    Convert HBV model output from mm/day to m³/s using catchment area from shapefile.
+    Convert HBV model output from mm/day to m³/s using catchment area.
 
     Parameters
     ----------
     model_output : pd.Series
-        Modelled discharge in mm/day
+        Modelled discharge in mm/day.
     shape_name : str
-        Name of the shapefile / catchment
+        Name of the shapefile defining the catchment. Used to compute catchment area.
 
     Returns
     -------
     pd.Series
-        Discharge converted to m³/s
+        Discharge converted to cubic meters per second (m³/s).
+
+    Notes
+    -----
+    Catchment area is obtained using `catchment_area_from_shapefile`.
     """
     # Compute catchment area in m²
     area_m2 = _get_catchment_area(shape_name)  # default returns m²
@@ -72,6 +76,7 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
 
 @lru_cache(maxsize=None)
 def _get_catchment_area(shape_name: str) -> float:
+    "Cached helper to retrieve catchment area to avoid repeated computations."
     return catchment_area_from_shapefile(shape_name)
 
 
@@ -154,13 +159,24 @@ def _generate_comparison_filename(file1, file2):
 
 def compare_inis(file1, file2): #, save_file=None):
     """
-    Compare two INI files and print differences to console and save to a file.
+    Compare two PCR-GLOBWB2 INI files and report differences.
+
     Parameters
-    ----------  
+    ----------
     file1 : str or Path
         Path to the first INI file.
     file2 : str or Path
         Path to the second INI file.
+
+    Returns
+    -------
+    None
+        Differences are printed to the console and also saved to a file
+        named "diff_file1_file2.txt" in the current directory.
+
+    Notes
+    -----
+    Output file is automatically named based on the two input filenames.
     """
     cp1 = _load_ini(file1)
     cp2 = _load_ini(file2)
@@ -234,6 +250,7 @@ def compare_inis(file1, file2): #, save_file=None):
 # =====================================================
 
 def _metadata_patterns() -> dict:
+    """Return a dictionary of regex patterns to extract metadata from GRDC station files."""
     return {
         "GRDC-No.": r"GRDC-No\.\s*:\s*(\d+)",
         "Station": r"Station\s*:\s*(.+)",
@@ -246,6 +263,7 @@ def _metadata_patterns() -> dict:
     }
 
 def _read_text_file(path: Path) -> str:
+    """Read a text file with UTF-8 encoding; fallback to Latin-1 if UTF-8 fails."""
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
@@ -253,6 +271,10 @@ def _read_text_file(path: Path) -> str:
 
 
 def _extract_metadata(content: str, patterns: dict) -> dict:
+    """Extract metadata from a text string using provided regex patterns.
+
+    Returns a dictionary with keys corresponding to pattern names.
+    """
     metadata = {}
     for key, pattern in patterns.items():
         match = re.search(pattern, content)
@@ -260,6 +282,7 @@ def _extract_metadata(content: str, patterns: dict) -> dict:
     return metadata
 
 def _determine_frequency(content: str | None) -> str:
+    """Determine time series frequency from content string ('Daily', 'Monthly', or '-')"""
     if not content:
         return "-"
     content = content.upper()
@@ -270,6 +293,7 @@ def _determine_frequency(content: str | None) -> str:
     return "-"
 
 def _collect_metadata(folder: Path, patterns: dict) -> pd.DataFrame:
+    """Collect metadata from all .txt files in a folder and return as a DataFrame."""
     records = []
 
     for txt_file in folder.glob("*.txt"):
@@ -281,6 +305,7 @@ def _collect_metadata(folder: Path, patterns: dict) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 def _convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert numeric columns (Catchment area, Data lines) to proper types and formatted strings."""
     df["Data lines"] = df["Data lines"].astype("Int64")
 
     df["Catchment area (km²)"] = df["Catchment area (km²)"].apply(
@@ -294,6 +319,7 @@ def _convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def _round_coordinates(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
+    """Round latitude and longitude to specified decimals and convert to string format."""
     for col in ["Latitude (DD)", "Longitude (DD)"]:
         df[col] = (
             df[col]
@@ -304,6 +330,7 @@ def _round_coordinates(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
     return df
 
 def _copy_nonempty_timeseries(df: pd.DataFrame) -> pd.DataFrame:
+    """Filter DataFrame to include only stations with non-empty time series."""
     numeric = pd.to_numeric(
         df["Data lines"].str.replace(",", "").replace("-", ""),
         errors="coerce",
@@ -311,6 +338,7 @@ def _copy_nonempty_timeseries(df: pd.DataFrame) -> pd.DataFrame:
     return df[numeric > 0].copy()
 
 def _select_and_rename_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Select relevant columns and rename them for GRDC metadata table."""
     columns = {
         "GRDC-No.": "GRDC No.",
         "Station": "Station",
@@ -325,6 +353,7 @@ def _select_and_rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df[list(columns.keys())].rename(columns=columns)
 
 def _sanitize_latex(value):
+    """Escape LaTeX special characters in a string (e.g., _, &, %)."""
     if isinstance(value, str):
         return (
             value.replace("_", r"\_")
@@ -335,6 +364,7 @@ def _sanitize_latex(value):
 
 
 def _sanitize_dataframe_for_latex(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply LaTeX sanitization to all string entries in the DataFrame."""
     return df.applymap(_sanitize_latex)
 
 def _export_to_latex(
@@ -344,6 +374,7 @@ def _export_to_latex(
     label: str,
     column_format: str,
 ):
+    """Export a DataFrame to a LaTeX file with longtable, caption, and label."""
     latex = df.to_latex(
         index=False,
         caption=caption,
@@ -355,6 +386,7 @@ def _export_to_latex(
     output_path.write_text(latex, encoding="utf-8")
 
 def _simplify_daily_timeseries(ts):
+    """Simplify daily time series string to 'start_year - end_year' format."""
     if pd.isna(ts):
         return "-"
     match = re.findall(r"(\d{4})", ts)
@@ -363,6 +395,7 @@ def _simplify_daily_timeseries(ts):
     return ts
 
 def _split_by_frequency(df: pd.DataFrame):
+    """Split metadata DataFrame into daily and monthly DataFrames and clean columns."""
     df_daily = df[df["Freq"] == "Daily"].copy()
     df_monthly = df[df["Freq"] == "Monthly"].copy()
 
@@ -388,6 +421,7 @@ def _export_daily_monthly_tables(
     export_dir: Path,
     base_filename: str,
 ):
+    """Export daily and monthly metadata DataFrames to separate LaTeX tables."""
     if not df_monthly.empty:
         latex_monthly = df_monthly.to_latex(
             index=False,
@@ -423,7 +457,11 @@ def build_grdc_metadata_table(
     base_filename: str = "grdc_selected_metadata",
 ) -> pd.DataFrame:
     """
-    Build cleaned GRDC station metadata tables.
+    Build cleaned GRDC station metadata tables from raw text files.
+
+    This function reads all GRDC station .txt files in a folder, extracts metadata,
+    formats numeric and coordinate columns, filters non-empty time series, sanitizes
+    strings for LaTeX, and optionally exports separate daily and monthly LaTeX tables.
 
     Parameters
     ----------
@@ -435,8 +473,12 @@ def build_grdc_metadata_table(
         If True, exports separate daily and monthly tables.
     base_filename : str, default "grdc_selected_metadata"
         Base name for exported LaTeX files (without suffix).
-    """
 
+    Returns
+    -------
+    pd.DataFrame
+        Cleaned metadata table for all stations.
+    """
     patterns = _metadata_patterns()
 
     df = _collect_metadata(folder_path, patterns)

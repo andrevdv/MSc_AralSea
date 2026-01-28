@@ -22,25 +22,23 @@ import xesmf as xe
 # ===========================================================================
 
 
-def setup_ERA5_forcing(shape_name: str, start: str, end: str):
+def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
     """
-    Setup and generate forcing data for a given shapefile and dataset.
+    Generate ERA5 forcing data for a lumped basin defined by a shapefile.
 
     Parameters
     ----------
     shape_name : str
-        Name of the shapefile (should match folder and shapefile name)
-    forcing_type : str
-        Type of forcing dataset, e.g., "ERA5", "CMIP"
+        Name of the shapefile (folder and file should be the same: .../shape_name/shape_name.shp).
     start : str
-        Start date in ISO format, e.g., "1950-01-01T00:00:00Z"
+        Start date in ISO format (YYYY-MM-DD or full ISO timestamp).
     end : str
-        End date in ISO format, e.g., "2020-12-31T00:00:00Z"
+        End date in ISO format (YYYY-MM-DD or full ISO timestamp).
 
     Returns
     -------
     ewatercycle.forcing.Forcing
-        The generated forcing object
+        ERA5-based forcing object written to NetCDF files on disk.
     """
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
@@ -68,8 +66,26 @@ def setup_ERA5_forcing(shape_name: str, start: str, end: str):
 
     return forcing
 
-def setup_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str="MPI-ESM1-2-HR"):
+def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str="MPI-ESM1-2-HR"):
+    """
+    Generate CMIP6 historical forcing data for a lumped basin.
 
+    Parameters
+    ----------
+    shape_name : str
+        Name of the shapefile (folder and file stem).
+    start : str
+        Start date in ISO format.
+    end : str
+        End date in ISO format.
+    model : str, optional
+        CMIP6 climate model name, by default "MPI-ESM1-2-HR".
+
+    Returns
+    -------
+    ewatercycle.forcing.Forcing
+        CMIP6 historical forcing object written to NetCDF files on disk.
+    """
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
     
@@ -102,7 +118,28 @@ def setup_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str
 
     return CMIP_forcing
 
-def setup_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str, model:str="EC-Earth3"):
+def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str, model:str="EC-Earth3"):
+    """
+    Generate CMIP6 future scenario forcing data for a lumped basin.
+
+    Parameters
+    ----------
+    shape_name : str
+        Name of the shapefile (folder and file stem).
+    start : str
+        Start date in ISO format.
+    end : str
+        End date in ISO format.
+    ssp : str
+        Scenario name (e.g., "ssp126", "ssp245", "ssp585").
+    model : str, optional
+        CMIP6 climate model name, by default "EC-Earth3".
+
+    Returns
+    -------
+    ewatercycle.forcing.Forcing
+        CMIP6 future forcing object written to NetCDF files on disk.
+    """
 
 
     # Path to the shapefile
@@ -143,7 +180,7 @@ def setup_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str, mode
 
     return CMIP_forcing
 
-def load_lumped_forcing(shape_name: str, forcing_type: str, year_span: str, base_forcing_dir=None):
+def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str, base_forcing_dir=None):
     """
     Load previously generated lumped forcing data for a given shapefile.
 
@@ -177,19 +214,36 @@ def load_lumped_forcing(shape_name: str, forcing_type: str, year_span: str, base
     return forcing
 
 def _ensure_dataset(obj):
+    """
+    Ensure the object is an xarray.Dataset.
+
+    Parameters
+    ----------
+    obj : xarray.Dataset or str / Path
+        If a path, the dataset will be opened using xr.open_dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset object.
+    """
     if isinstance(obj, xr.Dataset):
         return obj
     return xr.open_dataset(obj)
 
 
-def plot_ERA5_forcing(forcing_obj, shape_name: str = None):
+def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
     """
     Plot precipitation, temperature, shortwave radiation, and potential evaporation
     from a loaded ERA5 forcing object.
+
+    Parameters
+    ----------
+    forcing_obj : dict or ewatercycle.forcing.Forcing
+        Forcing object containing 'pr', 'tas', 'rsds', 'evspsblpot'.
+    shape_name : str, optional
+        Name of the catchment/shapefile, added to title if provided.
     """
-
-
-
 
     ERA5_data = {
         'precipitation pr': _ensure_dataset(forcing_obj['pr']),
@@ -256,7 +310,7 @@ def create_forcing_slice(forcing_obj, start, end):
 #     * CMIP future (SSP scenarios)
 # ===========================================================================
 
-def setup_ERA5_PCR_forcing(shape_name: str, start: str, end: str):
+def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
     """
     Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
@@ -314,7 +368,7 @@ def setup_ERA5_PCR_forcing(shape_name: str, start: str, end: str):
     
     return pcrglobwb_forcing
 
-def setup_cmip_hist_PCR_forcing(shape_name: str, start: str, end: str, model:str= "MPI-ESM1-2-HR" ,ensemble:str = "r1i1p1f1"):
+def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end: str, model:str= "MPI-ESM1-2-HR" ,ensemble:str = "r1i1p1f1"):
     """
     Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
@@ -383,7 +437,7 @@ def setup_cmip_hist_PCR_forcing(shape_name: str, start: str, end: str, model:str
     
     return pcrglobwb_forcing
 
-def setup_cmip_fut_PCR_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = "EC-Earth3", ensemble:str = "r1i1p1f1"):
+def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = "EC-Earth3", ensemble:str = "r1i1p1f1"):
     """
     Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
@@ -470,43 +524,42 @@ def setup_cmip_fut_PCR_forcing(shape_name: str, start: str, end: str,ssp: str, m
 
 def regrid_pcrglobwb_forcing(cmip_forcing, era5_forcing):
     """
-    Regrid CMIP PCR-GLOBWB forcing to match the ERA5 grid for precipitation and temperature.
-
-    This function applies variable-aware regridding to the CMIP NetCDF files
-    contained in the `cmip_forcing` object so that they exactly match the ERA5 grid
-    defined in `era5_forcing`.
+    Regrid CMIP PCR-GLOBWB forcing to match ERA5 grid.
 
     Parameters
     ----------
     cmip_forcing : PCRGlobWBForcing
-        CMIP forcing object loaded via ewatercycle.forcing.sources.load(). 
-        Must have `precipitationNC`, `temperatureNC`, and `directory` attributes.
+        CMIP forcing object with NetCDF files.
     era5_forcing : PCRGlobWBForcing
-        ERA5 forcing object loaded via ewatercycle.forcing.sources.load(). 
-        Provides the target grid for regridding.
+        ERA5 forcing object providing the target grid.
 
-    Warning
+    Returns
     -------
-    This function **overwrites the original CMIP NetCDF files** in `cmip_forcing.directory`.
-    Ensure you have a backup if you need to preserve the original data.
+    None
+        NetCDF files in cmip_forcing.directory are overwritten.
+
+    Notes
+    -----
+    - Original CMIP files are modified. Backup recommended.
+    - Applies variable-aware regridding to precipitation and temperature.
     """
-    regrid_cmip_forcing_to_era5(
+    _regrid_cmip_forcing_to_era5(
         cmip_path=cmip_forcing.directory / cmip_forcing.precipitationNC,
         era5_path=era5_forcing.directory / era5_forcing.precipitationNC,
     )
-    regrid_cmip_forcing_to_era5(
+    _regrid_cmip_forcing_to_era5(
         cmip_path=cmip_forcing.directory / cmip_forcing.temperatureNC,
         era5_path=era5_forcing.directory / era5_forcing.temperatureNC,
     )
 
 
-def regrid_cmip_forcing_to_era5(
+def _regrid_cmip_forcing_to_era5(
     cmip_path,
     era5_path,
     overwrite=True,
 ):
     """
-    Regrid CMIP forcing exactly onto ERA5 grid.
+    Internal Helper, Regrid CMIP forcing exactly onto ERA5 grid.
 
     Parameters
     ----------
@@ -600,3 +653,17 @@ def detect_forcing_variable(ds):
 # - Uses ERA5 as reference
 # ===========================================================================
 
+#Needs more testing.
+
+
+
+
+
+# ---------------------------
+# Backward compatibility
+setup_ERA5_forcing = generate_lumped_ERA5_forcing
+setup_CMIP_historical_forcing = generate_lumped_CMIP_historical_forcing
+setup_CMIP_future_forcing = generate_lumped_CMIP_future_forcing
+setup_ERA5_PCR_forcing = generate_PCRGLOBWB_ERA5_forcing
+setup_cmip_hist_PCR_forcing = generate_PCRGLOBWB_CMIP_historical_forcing
+setup_cmip_fut_PCR_forcing = generate_PCRGLOBWB_CMIP_future_forcing
