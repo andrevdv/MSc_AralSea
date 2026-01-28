@@ -580,7 +580,7 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
     return fig, ax
 
 def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
-                           show_plot=True, save_dir=None, prefix=""):
+                           show_plot=True, save_dir=None, prefix="", title_prefix=""):
     """
     Plot percentage bar charts for map and shapefiles.
     """
@@ -606,7 +606,8 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
     plt.bar(class_names, counts_to_percent(df_percent[map_col]), color=rgb_colors)
     plt.xticks(rotation=90)
     plt.ylabel("Percentage (%)")
-    plt.title(f"Köppen-Geiger Class Distribution ({map_col})")
+    title_str = f"{title_prefix} ({map_col})" if title_prefix else f"Köppen-Geiger Class Distribution ({map_col})"
+    plt.title(title_str)
     plt.grid(axis="y", linestyle="--", alpha=0.5)
     if save_dir:
         plt.savefig(Path(save_dir)/f"{map_col}_hist.png", dpi=300, bbox_inches="tight")
@@ -621,7 +622,8 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
         plt.bar(class_names, counts_to_percent(df_percent[col]), color=rgb_colors)
         plt.xticks(rotation=90)
         plt.ylabel("Percentage (%)")
-        plt.title(f"Köppen-Geiger Class Distribution ({col})")
+        title_str = f"{title_prefix} ({col})" if title_prefix else f"Köppen-Geiger Class Distribution ({col})"
+        plt.title(title_str)
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         if save_dir:
             plt.savefig(Path(save_dir) / f"koppen_hist_{prefix}_{col}.png", dpi=300, bbox_inches="tight")
@@ -705,7 +707,8 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             shapefiles=shapefiles,
             save_dir=analysis_dir,
             prefix=suffix,
-            show_plot=show_plot
+            show_plot=show_plot,
+            title_prefix=f"Köppen-Geiger Class Distribution ({year_range}" + (f", {scenario}" if scenario else "") + ")",
         )
 
     # --- Table ---
