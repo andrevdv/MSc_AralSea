@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from pathlib import Path
 
 #Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
@@ -44,7 +45,11 @@ class LakeGeometry:
             Path to CSV file containing the AHV curve. Columns must be separated
             by ';' and decimal points may use ','.
         """
+        if not Path(ahv_csv).exists():
+            raise FileNotFoundError(f"AHV file not found: {ahv_csv}")
+        
         df = pd.read_csv(ahv_csv, sep=';', decimal=',').sort_values("elevation_m")
+        self.df = df  # Store the DataFrame for potential future use
 
         self.h_of_v = interp1d(
             df["volume_km3"],
@@ -74,6 +79,8 @@ class LakeGeometry:
         float
             Lake surface elevation in meters
         """
+        if V_km3 < 0:
+            raise ValueError(f"Volume cannot be negative: {V_km3}")
         return float(self.h_of_v(V_km3))
 
     def area_from_volume(self, V_km3):
@@ -93,8 +100,40 @@ class LakeGeometry:
         float
             Lake surface area in km²
         """
+        if V_km3 < 0:
+            raise ValueError(f"Volume cannot be negative: {V_km3}")
         h = self.elevation_from_volume(V_km3)
+
         return float(self.a_of_h(h))
+    
+    def plot_ahv_curve(self):
+        """Plot the area-height-volume relationships for validation."""
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        df = self.df
+
+        # 1. Area vs Height
+        axes[0].plot(df["elevation_m"], df["area_km2"], marker='o', color='tab:blue')
+        axes[0].set_xlabel("Height [m]")
+        axes[0].set_ylabel("Area [km²]")
+        axes[0].set_title("Area vs Height")
+        axes[0].grid(True)
+
+        # 2. Volume vs Height
+        axes[1].plot(df["elevation_m"], df["volume_km3"], marker='o', color='tab:green')
+        axes[1].set_xlabel("Height [m]")
+        axes[1].set_ylabel("Volume [km³]")
+        axes[1].set_title("Volume vs Height")
+        axes[1].grid(True)
+
+        # 3. Volume vs Area
+        axes[2].plot(df["area_km2"], df["volume_km3"], marker='o', color='tab:orange')
+        axes[2].set_xlabel("Area [km²]")
+        axes[2].set_ylabel("Volume [km³]")
+        axes[2].set_title("Volume vs Area")
+        axes[2].grid(True)
+
+        fig.tight_layout()
+        return fig, axes
     
 class River:
     def __init__(self, df, q_col, name=None, factor=86400/1e9):

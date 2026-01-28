@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import xarray as xr
 import xesmf as xe
 
-from src.paths import *
+from src.paths import SHAPEFILES, FORCING_ERA5, FORCING_CMIP_HIST, FORCING_CMIP_FUT, FORCING_PCRGLOB, FORCING_OUTPUT
 from src.utils import get_integer_multiple_bounds
 
 # ===========================================================================

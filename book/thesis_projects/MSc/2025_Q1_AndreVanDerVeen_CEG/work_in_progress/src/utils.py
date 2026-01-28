@@ -23,13 +23,13 @@ import rasterio.mask
 from pyproj import Geod
 from shapely.geometry import box, mapping, shape
 
-from src.paths import *
+from src.paths import SHAPEFILES, INI_COMPARISON
+
 
 import requests
 import json
 import pprint
 import os
-
 
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
