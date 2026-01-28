@@ -25,6 +25,11 @@ from shapely.geometry import box, mapping, shape
 
 from src.paths import *
 
+import requests
+import json
+import pprint
+import os
+
 
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
@@ -670,6 +675,10 @@ def generate_koppen_tables(
             [koppen_description.get(idx, "Other classes") for idx in top_df.index]
         )
 
+    # # --- Add "(%)" to percentage columns ---
+    # cols = top_df.columns.tolist()
+    # top_df.columns = [cols[0]] + [f"{col} (%)" for col in cols[1:]]
+
     # Save LaTeX
     if save_tex:
         latex_table = top_df.to_latex(
@@ -742,3 +751,62 @@ def extract_scenario_and_year(path):
     year_index = parts.index(year_range)
     scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
     return year_range, scenario
+
+
+def download_dahiti_water_level(
+    dahiti_id: int,
+    api_key: str,
+    file_format: str = "netcdf",
+    download_folder: str = "downloads"
+    ) -> str:
+    """
+    Download water level data from DAHITI.
+
+    Parameters
+    ----------
+    dahiti_id : int
+        The DAHITI station ID
+    api_key : str
+        Your DAHITI API key
+    file_format : str
+        Output format: 'netcdf', 'ascii', 'json', 'csv'
+    download_folder : str
+        Folder to save downloaded files (default: 'downloads')
+
+    Returns
+    -------
+    str
+        Path to downloaded file (for netcdf) or raw data (str or dict)
+    """
+
+    os.makedirs(download_folder, exist_ok=True)
+    url = "https://dahiti.dgfi.tum.de/api/v2/download-water-level/"
+    params = {
+        "api_key": api_key,
+        "dahiti_id": dahiti_id,
+        "format": file_format
+    }
+
+    response = requests.get(url, params=params)
+    
+    if response.status_code != 200:
+        raise Exception(f"Request failed [{response.status_code}]: {response.text}")
+
+    # Handle formats
+    if file_format == "ascii":
+        return response.text
+    elif file_format == "json":
+        return response.json()
+    elif file_format == "csv":
+        return response.text
+    elif file_format == "netcdf":
+        file_path = os.path.join(download_folder, f"{dahiti_id}_water_level.nc")
+        print(f"Writing to {file_path} ...")
+        with open(file_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:
+                    f.write(chunk)
+        print("Done!")
+        return file_path
+    else:
+        raise ValueError(f"Unknown format: {file_format}")

@@ -17,6 +17,7 @@ BATHYMETRY = DATA / "bathymetry"
 SHAPEFILES = DATA / "shapefiles"
 KOPPEN_GEIGER = DATA / "koppen_geiger_tif"
 
+DAHITI = DATA / "dahiti"
 # ------------------------------
 # Forcing
 # ------------------------------
