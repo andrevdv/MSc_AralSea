@@ -10,7 +10,40 @@ import matplotlib.dates as mdates
 
 #Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
+    """
+    Represent the geometry of a lake using an area-height-volume (AHV) relationship.
+
+    This class provides methods to compute lake surface elevation and area
+    from a given volume, based on an AHV curve loaded from CSV.
+
+    TODO expand with north south split etc
+
+    Attributes
+    ----------
+    h_of_v : scipy.interpolate.interp1d
+        Interpolation function for elevation (m) as a function of volume (km³).
+    a_of_h : scipy.interpolate.interp1d
+        Interpolation function for area (km²) as a function of elevation (m).
+    """
     def __init__(self, ahv_csv):
+        """
+        Initialize LakeGeometry from an area-height-volume (AHV) CSV file.
+
+        The CSV file must have columns:
+            - elevation_m : lake surface elevation (meters)
+            - volume_km3  : lake volume (km³)
+            - area_km2    : lake surface area (km²)
+
+        The constructor creates two interpolation functions:
+            - elevation as a function of volume
+            - area as a function of elevation
+
+        Parameters
+        ----------
+        ahv_csv : str or Path
+            Path to CSV file containing the AHV curve. Columns must be separated
+            by ';' and decimal points may use ','.
+        """
         df = pd.read_csv(ahv_csv, sep=';', decimal=',').sort_values("elevation_m")
 
         self.h_of_v = interp1d(
@@ -28,9 +61,38 @@ class LakeGeometry:
         )
 
     def elevation_from_volume(self, V_km3):
+        """
+        Compute lake surface elevation from volume using interpolation.
+
+        Parameters
+        ----------
+        V_km3 : float
+            Lake volume in km³
+
+        Returns
+        -------
+        float
+            Lake surface elevation in meters
+        """
         return float(self.h_of_v(V_km3))
 
     def area_from_volume(self, V_km3):
+        """
+        Compute lake surface area from volume using interpolation.
+
+        Internally, it first computes elevation from volume, then uses the
+        area-elevation relationship.
+
+        Parameters
+        ----------
+        V_km3 : float
+            Lake volume in km³
+
+        Returns
+        -------
+        float
+            Lake surface area in km²
+        """
         h = self.elevation_from_volume(V_km3)
         return float(self.a_of_h(h))
     
@@ -53,13 +115,30 @@ class River:
         self.name = name
         self.Q_raw = df[q_col]       # original m³/s
         self.Q = self.Q_raw * factor # km³/day
-    
+
+    def plot_yearly(self):
+        """
+        Plot yearly discharge as a bar chart.
+        """
+        yearly = self.Q.resample('Y').sum()
+        plt.figure(figsize=(10, 4))
+        plt.bar(yearly.index.year, yearly.values, color='skyblue')
+        plt.ylabel('Yearly Discharge (km³/yr)')
+        plt.xlabel('Year')
+        plt.title(f'{self.name} Yearly Discharge')
+        plt.grid(True)
+        plt.show()
+
+
+#fluxes
 def discharge_to_km3day(Q_m3s):
+    """
+    converts discharge from m3s to km3day
+    
+    :param Q_m3s: Description
+    """
     return Q_m3s * 86400 / 1e9
 
-##fluxes
-def discharge_to_km3day(Q_m3s):
-    return Q_m3s * 86400 / 1e9
 
 def compute_total_river_inflow(i, rivers, connected=True):
     """
@@ -120,6 +199,9 @@ def update_volume(
     Q_gw=0.0,
     scale_inflow=1.0
 ):
+    """
+    updates the volume for the volume balance model. rudimentary right now.
+    """
     V_new = (
         V_prev
         + scale_inflow * Q_in
@@ -197,8 +279,30 @@ def run_connected_aral_model(
 
 
 def plot_aral_results(df):
+    """
+    Plot Aral Sea simulation results as side-by-side time series.
 
+    This function creates three horizontally aligned subplots showing:
+    - Lake volume (km³)
+    - Surface elevation (m)
+    - Surface area (km²)
 
+    Each subplot has a title, axis labels, grid, and formatted time axis.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing simulation results with the following columns:
+        - 'time' : datetime-like, time axis
+        - 'volume_km3' : float, lake volume in km³
+        - 'elevation_m' : float, lake surface elevation in meters
+        - 'area_km2' : float, lake surface area in km²
+
+    Returns
+    -------
+    None
+        The function displays a matplotlib figure and does not return anything.
+    """
     # Wider figure for side-by-side plots
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
