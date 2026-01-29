@@ -10,6 +10,10 @@ import matplotlib.dates as mdates
 from pathlib import Path
 import xarray as xr
 from src.constants import MAKKINK_FACTOR
+from tqdm import tqdm
+from src.paths import GRDC
+
+
 
 #Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
@@ -195,19 +199,31 @@ class River:
         if not pd.api.types.is_datetime64_any_dtype(self.Q_raw.index):
             self.Q_raw.index = pd.to_datetime(self.Q_raw.index)
 
-        # Apply conversion factor and scaling
-        self.Q = self.Q_raw * factor * scaling
+        # -------------------------
+        # Detect monthly vs daily
+        # -------------------------
+        freq = pd.infer_freq(self.Q_raw.index)
+        if freq and freq.startswith("M"):
+            # Monthly average m³/s → daily km³/day via interpolation
+            daily_index = pd.date_range(start=self.Q_raw.index.min(),
+                                        end=self.Q_raw.index.max(),
+                                        freq="D")
+            self.Q = self.Q_raw.reindex(daily_index).interpolate("time")  # m³/s daily
+            self.Q = self.Q * factor * scaling  # convert to km³/day
+        else:
+            # Assume daily data already
+            self.Q = self.Q_raw * factor * scaling
 
     def plot_yearly(self, skipna=True):
-        """
-        Plot yearly discharge as a bar chart.
-        """
-        yearly = self.Q.resample('YE').sum(min_count=1 if skipna else None)
+        Q = self.Q.copy()
+        if skipna:
+            Q = Q.dropna()
+        yearly = Q.resample("Y").sum(min_count=1 if skipna else None)
         plt.figure(figsize=(10, 4))
         plt.bar(yearly.index.year, yearly.values, color='skyblue')
-        plt.ylabel('Yearly Discharge (km³/yr)')
-        plt.xlabel('Year')
-        plt.title(f'{self.name} Yearly Discharge')
+        plt.ylabel("Yearly Discharge (km³/yr)")
+        plt.xlabel("Year")
+        plt.title(f"{self.name} Yearly Discharge")
         plt.grid(True)
         plt.show()
 
@@ -410,7 +426,7 @@ def run_connected_aral_model(
     V.iloc[0] = V0_km3
     geom = LakeGeometry(ahv_csv)
 
-    for i in range(1, n):
+    for i in tqdm(range(1, n), desc = "Simulating Aral Sea volume balance"):
         # Geometry
         A.iloc[i] = geom.area_from_volume(V.iloc[i-1])
         H.iloc[i] = geom.elevation_from_volume(V.iloc[i-1])
@@ -441,69 +457,70 @@ def run_connected_aral_model(
     })
 
 
-def plot_aral_results(df):
+def plot_aral_results(results, labels=None):
     """
-    Plot Aral Sea simulation results as side-by-side time series.
-
-    This function creates three horizontally aligned subplots showing:
-    - Lake volume (km³)
-    - Surface elevation (m)
-    - Surface area (km²)
-
-    Each subplot has a title, axis labels, grid, and formatted time axis.
+    Plot one or more Aral Sea simulation results side-by-side.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        DataFrame containing simulation results with the following columns:
-        - 'time' : datetime-like, time axis
-        - 'volume_km3' : float, lake volume in km³
-        - 'elevation_m' : float, lake surface elevation in meters
-        - 'area_km2' : float, lake surface area in km²
+    results : pandas.DataFrame or list of pandas.DataFrame
+        Single DataFrame or a list of DataFrames containing simulation results.
+        Each DataFrame must have columns:
+        'time', 'volume_km3', 'elevation_m', 'area_km2'
+    labels : list of str, optional
+        Labels for each simulation. If None, default labels will be used.
 
     Returns
     -------
     None
-        The function displays a matplotlib figure and does not return anything.
+        Displays a matplotlib figure.
     """
-    # Wider figure for side-by-side plots
+    # Ensure results is a list
+    if not isinstance(results, list):
+        results = [results]
+
+    n_results = len(results)
+    
+    # Default labels
+    if labels is None:
+        labels = [f'Simulation {i+1}' for i in range(n_results)]
+
+    # Create subplots
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
-    # Volume
-    axs[0].plot(df['time'], df['volume_km3'], label='Volume', color='blue')
+    # Define colors
+    colors = plt.cm.tab10.colors  # up to 10 colors
+    colors = colors * ((n_results // 10) + 1)
+
+    # Plot each simulation
+    for df, label, color in zip(results, labels, colors):
+        axs[0].plot(df['time'], df['volume_km3'], label=label, color=color)
+        axs[1].plot(df['time'], df['elevation_m'], label=label, color=color)
+        axs[2].plot(df['time'], df['area_km2'], label=label, color=color)
+
+    # Set titles and labels
     axs[0].set_ylabel('Volume (km³)')
     axs[0].set_title('Aral Sea Volume')
-    axs[0].set_xlabel('Time')
-    axs[0].grid(True)
-
-    # Elevation
-    axs[1].plot(df['time'], df['elevation_m'], label='Elevation', color='orange')
     axs[1].set_ylabel('Elevation (m)')
     axs[1].set_title('Aral Sea Elevation')
-    axs[1].set_xlabel('Time')
-    axs[1].grid(True)
-
-    # Area
-    axs[2].plot(df['time'], df['area_km2'], label='Area', color='green')
     axs[2].set_ylabel('Area (km²)')
     axs[2].set_title('Aral Sea Area')
-    axs[2].set_xlabel('Time')
-    axs[2].grid(True)
 
-    # Format x-axis as dates and rotate labels
     for ax in axs:
+        ax.set_xlabel('Time')
+        ax.grid(True)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-
+        ax.legend()  # show legend for multiple simulations
 
     plt.tight_layout()
     plt.show()
 
 def plot_aral_fluxes(df):
     """
-    Plot yearly inflow and evaporation for the Aral Sea simulation.
+    Plot yearly inflow, evaporation, and net flux for the Aral Sea simulation.
 
-    Creates two side-by-side subplots with the same y-axis scale.
+    Creates three side-by-side subplots with the same y-axis scale for inflow and evaporation.
 
     Parameters
     ----------
@@ -520,13 +537,19 @@ def plot_aral_fluxes(df):
     # Resample to yearly totals
     df_yearly = df.set_index("time").resample("YE").sum()
 
-    # Determine shared y-axis limit
-    y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())
+    # Net flux (inflow - evaporation)
+    df_yearly["net_flux"] = df_yearly["Q_in_km3day"] - df_yearly["evap_km3day"]
 
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+    # Determine shared y-axis limit for inflow and evaporation
+    y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())
+    # For net flux, allow both positive and negative values
+    net_min = 1.1 * df_yearly["net_flux"].min()
+    net_max = 1.1 * df_yearly["net_flux"].max()
+
+    fig, axs = plt.subplots(1, 3, figsize=(20, 5))
 
     # Yearly inflow
-    axs[0].bar(df_yearly.index.year, df_yearly["Q_in_km3day"], color='skyblue')
+    axs[0].bar(df_yearly.index.year, df_yearly["Q_in_km3day"], color='tab:blue')
     axs[0].set_title("Yearly River Inflow")
     axs[0].set_xlabel("Year")
     axs[0].set_ylabel("Inflow (km³/yr)")
@@ -534,12 +557,20 @@ def plot_aral_fluxes(df):
     axs[0].grid(True)
 
     # Yearly evaporation
-    axs[1].bar(df_yearly.index.year, df_yearly["evap_km3day"], color='salmon')
+    axs[1].bar(df_yearly.index.year, df_yearly["evap_km3day"], color='tab:red')
     axs[1].set_title("Yearly Evaporation")
     axs[1].set_xlabel("Year")
     axs[1].set_ylabel("Evaporation (km³/yr)")
     axs[1].set_ylim(0, y_max)
     axs[1].grid(True)
+
+    # Yearly net flux
+    axs[2].bar(df_yearly.index.year, df_yearly["net_flux"], color='tab:green')
+    axs[2].set_title("Yearly Net Flux (Inflow - Evaporation)")
+    axs[2].set_xlabel("Year")
+    axs[2].set_ylabel("Net Flux (km³/yr)")
+    axs[2].set_ylim(net_min, net_max)
+    axs[2].grid(True)
 
     plt.tight_layout()
     plt.show()
@@ -586,3 +617,44 @@ def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
 
     return paths
 
+def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFrame:
+    """
+    Load a GRDC monthly discharge file and return a clean DataFrame
+    indexed by datetime with monthly frequency.
+
+    Parameters
+    ----------
+    file : str or Path
+        Path to the GRDC monthly text file
+    q_col : str
+        Column name to select as discharge
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with datetime index (month start) and discharge column
+    """
+    df = pd.read_csv(
+        GRDC/"Monthly"/ f"{grdc_id}_Q_Month.txt",
+        sep=";",
+        comment="#",
+        usecols=["YYYY-MM-DD", f" {q_col}"],  # original file may have leading space
+        parse_dates=["YYYY-MM-DD"],
+        encoding="latin1",
+        na_values=-999.0
+    )
+
+    df.columns = df.columns.str.strip()
+    df = df[["YYYY-MM-DD", q_col]]
+
+    # Set datetime index with monthly frequency
+    df["YYYY-MM-DD"] = pd.to_datetime(df["YYYY-MM-DD"])
+    df.set_index("YYYY-MM-DD", inplace=True)
+    df.index = df.index.to_period("M").to_timestamp()
+
+    # Set river name if not provided
+    if name is None:
+        name = f"GRDC {grdc_id}"
+
+    # Return River object
+    return River(df, q_col=q_col, name=name)

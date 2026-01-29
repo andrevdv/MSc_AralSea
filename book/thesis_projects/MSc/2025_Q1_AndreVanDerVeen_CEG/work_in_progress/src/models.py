@@ -22,6 +22,7 @@ from tqdm.notebook import tqdm
 from src.paths import INI_FILES, OUTPUT_HBV
 from src.utils import catchment_area_from_shapefile, mmday_to_m3s
 from src.paths import PCR_GLOBAL_PARAMS
+from src.constants import HBV_PARAM_BOUNDS
 
 def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -346,8 +347,11 @@ history = {
     "objective": []
 }
 
-p_min = np.array([0, 0.2, 40, 0.5, 0.001, 1, 0.01, 0.0001, 0.01])
-p_max = np.array([25, 1, 800, 4, 0.3, 15, 0.02, 0.01, 0.8])
+
+p_min = HBV_PARAM_BOUNDS['min']
+p_max = HBV_PARAM_BOUNDS['max']
+# p_min = np.array([0, 0.2, 40, 0.5, 0.001, 1, 0.01, 0.0001, 0.01])
+# p_max = np.array([25, 1, 800, 4, 0.3, 15, 0.02, 0.01, 0.8])
 
 # scale parameters
 def scale(theta):

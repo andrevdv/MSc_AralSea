@@ -1,5 +1,12 @@
 """
-# Constants for the Aral Sea thesis project
+Constants for the Aral Sea thesis project.
+
+Includes:
+- HBV model parameter bounds and defaults
+- CMA-ES calibration settings
+- CMIP6 model configurations
+- PCR-GLOBWB grid settings
+- Aral Sea model constants
 """
 import numpy as np
 
@@ -78,15 +85,15 @@ INITIAL_CONDITION_NAMES_LONG = [
 ]
 
 TYUMEN_ARYK_HBV_PARAMS_CMAES = [
-    22.459392,  # Imax
-    0.690535,   # Ce
-    188.080331, # Sumax
-    0.669292,   # Beta
-    0.281391,   # Pmax
-    2.097142,   # Tlag
-    0.014930,   # Kf
-    0.009363,   # Ks
-    0.135953   # FM
+    0.222612,  # Imax
+    0.473759,  # Ce
+    721.898890, # Sumax
+    1.939276,  # Beta
+    0.283583,  # Pmax
+    7.902570,  # Tlag
+    0.010001,  # Kf
+    0.005879,  # Ks
+    0.790641   # FM
 ]
 
 
@@ -96,14 +103,14 @@ TYUMEN_ARYK_HBV_PARAMS_CMAES = [
 # ==============================================================================
 CMAES_DEFAULT_POPSIZE = 15
 CMAES_DEFAULT_MAXFEVALS = 500
-CMAES_DEFAULT_SIGMA = 0.1
+CMAES_DEFAULT_SIGMA = 0.1   # Initial step size (normalized space)
 
 
 # Objective function weights
 OBJECTIVE_WEIGHTS = {
-'nse': 0.3,
-'kge': 0.3,
-'volume_error': 0.4,
+"nse": 0.3,
+"kge": 0.3,
+"volume_error": 0.4,
 }
 
 # ==============================================================================
@@ -111,12 +118,12 @@ OBJECTIVE_WEIGHTS = {
 # ==============================================================================
 # Default CMIP6 models
 DEFAULT_CMIP6_MODELS = {
-'historical': 'MPI-ESM1-2-HR', 
-'future': 'MPI-ESM1-2-HR' #, EC-Earth3
+"historical": "MPI-ESM1-2-HR", 
+"future": "MPI-ESM1-2-HR" #, EC-Earth3
 }
 
 # SSP scenarios
-SSP_SCENARIOS = ['ssp126', 'ssp245', 'ssp585'] #these have the best data coverage
+SSP_SCENARIOS = ["ssp126", "ssp245", "ssp585"] #these have the best data coverage
 
 
 
@@ -132,4 +139,4 @@ PCRGLOBWB_ESMVALTOOL_PADDING = 2 # degrees, padding for forcing extraction
 # ==============================================================================
 # Aral Sea Model Constants
 # ==============================================================================
-MAKKINK_FACTOR = 1.15
+MAKKINK_FACTOR = 1.15 # Makkink correction factor (dimensionless) for open water evaporation estimation

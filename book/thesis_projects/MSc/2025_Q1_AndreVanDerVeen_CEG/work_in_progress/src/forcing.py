@@ -18,6 +18,7 @@ import xesmf as xe
 
 from src.paths import SHAPEFILES, FORCING_ERA5, FORCING_CMIP_HIST, FORCING_CMIP_FUT, FORCING_PCRGLOB, FORCING_OUTPUT
 from src.utils import get_integer_multiple_bounds
+from src.constants import DEFAULT_CMIP6_MODELS
 
 # ===========================================================================
 # FORCING GENERATION (LUMPED)
@@ -78,7 +79,7 @@ def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
 
     return forcing
 
-def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str="MPI-ESM1-2-HR"):
+def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str=DEFAULT_CMIP6_MODELS['historical']):
     """
     Generate CMIP6 historical forcing data for a lumped basin.
 
@@ -130,7 +131,7 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
 
     return CMIP_forcing
 
-def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str="ssp245", model:str="EC-Earth3"):
+def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str="ssp245", model:str=DEFAULT_CMIP6_MODELS["future"]):
     """
     Generate CMIP6 future scenario forcing data for a lumped basin.
 
@@ -380,7 +381,7 @@ def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
     
     return pcrglobwb_forcing
 
-def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end: str, model:str= "MPI-ESM1-2-HR" ,ensemble:str = "r1i1p1f1"):
+def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end: str, model:str= DEFAULT_CMIP6_MODELS['historical'] ,ensemble:str = "r1i1p1f1"):
     """
     Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
@@ -449,7 +450,7 @@ def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end:
     
     return pcrglobwb_forcing
 
-def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = "EC-Earth3", ensemble:str = "r1i1p1f1"):
+def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = DEFAULT_CMIP6_MODELS["future"], ensemble:str = "r1i1p1f1"):
     """
     Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
