@@ -77,7 +77,17 @@ INITIAL_CONDITION_NAMES_LONG = [
     "Sp_initial_percolation_storage"     # 4: Initial percolation storage (mm)
 ]
 
-
+TYUMEN_ARYK_HBV_PARAMS_CMAES = [
+    22.459392,  # Imax
+    0.690535,   # Ce
+    188.080331, # Sumax
+    0.669292,   # Beta
+    0.281391,   # Pmax
+    2.097142,   # Tlag
+    0.014930,   # Kf
+    0.009363,   # Ks
+    0.135953   # FM
+]
 
 
 
@@ -101,8 +111,8 @@ OBJECTIVE_WEIGHTS = {
 # ==============================================================================
 # Default CMIP6 models
 DEFAULT_CMIP6_MODELS = {
-'historical': 'MPI-ESM1-2-HR',
-'future': 'EC-Earth3',
+'historical': 'MPI-ESM1-2-HR', 
+'future': 'MPI-ESM1-2-HR' #, EC-Earth3
 }
 
 # SSP scenarios
@@ -117,3 +127,9 @@ SSP_SCENARIOS = ['ssp126', 'ssp245', 'ssp585'] #these have the best data coverag
 PCRGLOBWB_RESOLUTION_MULTIPLE = 3 # degrees, for get_integer_multiple_bounds
 PCRGLOBWB_ESMVALTOOL_PADDING = 2 # degrees, padding for forcing extraction
 
+
+
+# ==============================================================================
+# Aral Sea Model Constants
+# ==============================================================================
+MAKKINK_FACTOR = 1.15

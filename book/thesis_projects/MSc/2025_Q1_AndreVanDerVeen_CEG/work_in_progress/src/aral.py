@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pathlib import Path
+import xarray as xr
+from src.constants import MAKKINK_FACTOR
 
 #Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
@@ -136,30 +138,71 @@ class LakeGeometry:
         return fig, axes
     
 class River:
-    def __init__(self, df, q_col, name=None, factor:float=86400/1e9, scaling:float=1):
+    def __init__(self, data, q_col=None, name=None, factor: float = 86400/1e9, scaling: float = 1):
         """
         Wraps a river discharge time series for the lake model.
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            Time series with at least the discharge column
-        q_col : str
-            Name of the column containing discharge
+        data : pd.DataFrame, pd.Series, xr.DataArray, xr.Dataset, str or Path
+            Input time series. Can be:
+            - pandas DataFrame or Series
+            - xarray DataArray or Dataset
+            - path to a NetCDF file (str or Path)
+        q_col : str, optional
+            Column name in DataFrame or Dataset (required if multiple variables)
         name : str, optional
-            River name (for plotting or debugging)
-        factor : float, optional
+            River name (for plotting)
+        factor : float
             Unit conversion factor (e.g., m³/s → km³/day)
+        scaling : float
+            Additional scaling factor
         """
         self.name = name
-        self.Q_raw = df[q_col]       # original m³/s
-        self.Q = self.Q_raw * factor * scaling # km³/day
 
-    def plot_yearly(self):
+        # Handle string / Path input (NetCDF)
+        if isinstance(data, (str, Path)):
+            ds = xr.open_dataset(data)
+            if q_col is None:
+                # Use the first variable by default
+                var_name = list(ds.data_vars)[0]
+            else:
+                var_name = q_col
+            self.Q_raw = ds[var_name].to_pandas()
+
+        # Handle xarray DataArray / Dataset
+        elif isinstance(data, xr.DataArray):
+            self.Q_raw = data.to_pandas()
+        elif isinstance(data, xr.Dataset):
+            if q_col is None:
+                # Use the first variable by default
+                var_name = list(data.data_vars)[0]
+            else:
+                var_name = q_col
+            self.Q_raw = data[var_name].to_pandas()
+
+        # Handle pandas DataFrame / Series
+        elif isinstance(data, pd.DataFrame):
+            if q_col is None:
+                raise ValueError("q_col must be provided when passing a DataFrame")
+            self.Q_raw = data[q_col]
+        elif isinstance(data, pd.Series):
+            self.Q_raw = data
+        else:
+            raise TypeError(f"Unsupported data type: {type(data)}")
+
+        # Ensure datetime index
+        if not pd.api.types.is_datetime64_any_dtype(self.Q_raw.index):
+            self.Q_raw.index = pd.to_datetime(self.Q_raw.index)
+
+        # Apply conversion factor and scaling
+        self.Q = self.Q_raw * factor * scaling
+
+    def plot_yearly(self, skipna=True):
         """
         Plot yearly discharge as a bar chart.
         """
-        yearly = self.Q.resample('Y').sum()
+        yearly = self.Q.resample('YE').sum(min_count=1 if skipna else None)
         plt.figure(figsize=(10, 4))
         plt.bar(yearly.index.year, yearly.values, color='skyblue')
         plt.ylabel('Yearly Discharge (km³/yr)')
@@ -168,6 +211,67 @@ class River:
         plt.grid(True)
         plt.show()
 
+    def plot_daily(self, skipna=True):
+        """
+        Plot daily discharge as a line chart.
+        """
+        daily = self.Q.copy()
+        if skipna:
+            daily = daily.dropna()
+        plt.figure(figsize=(12, 4))
+        plt.plot(daily.index, daily.values, color='dodgerblue')
+        plt.ylabel('Daily Discharge (km³/day)')
+        plt.xlabel('Date')
+        plt.title(f'{self.name} Daily Discharge')
+        plt.grid(True)
+        plt.show()
+
+class MultiRiver:
+    def __init__(self, rivers, q_col=None, factor: float = 86400/1e9, scaling: float = 1):
+        """
+        Wrapper for multiple rivers.
+
+        Parameters
+        ----------
+        rivers : dict
+            Keys = river names, values = data (DataFrame/Series/xarray/NetCDF)
+        q_col : str, optional
+            Column name for DataFrames/Datasets with multiple variables
+        factor, scaling : float
+            Unit conversion and scaling
+        """
+        self.rivers = {}
+        for name, data in rivers.items():
+            if isinstance(data, River):
+                self.rivers[name] = data
+            else:
+                self.rivers[name] = River(data, name=name)
+
+    def plot_yearly(self):
+        plt.figure(figsize=(12, 5))
+        for name, river in self.rivers.items():
+            yearly = river.Q.resample('YE').sum()
+            plt.plot(yearly.index.year, yearly.values, marker='o', label=name)
+        plt.ylabel('Yearly Discharge (km³/yr)')
+        plt.xlabel('Year')
+        plt.title('Yearly Discharge - Multiple Rivers')
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+    def plot_daily(self):
+        plt.figure(figsize=(12, 5))
+        for name, river in self.rivers.items():
+            daily = river.Q.dropna()
+            plt.plot(daily.index, daily.values, label=name)
+        plt.ylabel('Daily Discharge (km³/day)')
+        plt.xlabel('Date')
+        plt.title('Daily Discharge - Multiple Rivers')
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+    
 
 #fluxes
 def discharge_to_km3day(Q_m3s):
@@ -226,6 +330,9 @@ def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     
     # mm/day → km³/day
     evap_km3_day = evap_mm_day / 1e6 * area_km2
+
+    # makkink conversion factor open water evaporation
+    evap_km3_day = MAKKINK_FACTOR * evap_km3_day
     return evap_km3_day
 
 
@@ -251,13 +358,13 @@ def update_volume(
 
 # --- main model ---
 def run_connected_aral_model(
-    aral_meteo,
-    rivers,      # list of River objects, e.g., [River_Amu_Darya, River_Syr_Darya]
-    ahv_csv,
-    V0_km3,
+    aral_meteo: xr.Dataset,     # xarray Dataset with meteo forcing, must containg [evspsblpot]
+    rivers: list["River"],      # list of River objects, e.g., [River_Amu_Darya, River_Syr_Darya]
+    ahv_csv: str,              # path to A-H-V CSV file with columns: elevation_m, volume_km3, area_km2
+    V0_km3: float = 1100,       # initial lake volume [km3]
     start_time=None,  # optional: datetime-like string or pd.Timestamp
     end_time=None     # optional: datetime-like string or pd.Timestamp
-):
+)-> pd.DataFrame:
     """
     Connected Aral Sea daily water balance model.
 
@@ -411,7 +518,7 @@ def plot_aral_fluxes(df):
     None
     """
     # Resample to yearly totals
-    df_yearly = df.set_index("time").resample("Y").sum()
+    df_yearly = df.set_index("time").resample("YE").sum()
 
     # Determine shared y-axis limit
     y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())

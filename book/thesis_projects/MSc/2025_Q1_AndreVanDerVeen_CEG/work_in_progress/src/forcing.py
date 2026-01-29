@@ -130,7 +130,7 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
 
     return CMIP_forcing
 
-def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str, model:str="EC-Earth3"):
+def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str="ssp245", model:str="EC-Earth3"):
     """
     Generate CMIP6 future scenario forcing data for a lumped basin.
 
