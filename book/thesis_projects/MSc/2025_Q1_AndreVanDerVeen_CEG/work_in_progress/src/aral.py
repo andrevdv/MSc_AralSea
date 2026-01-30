@@ -10,8 +10,9 @@ import matplotlib.dates as mdates
 from pathlib import Path
 import xarray as xr
 from src.constants import MAKKINK_FACTOR
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from src.paths import GRDC
+import pickle
 
 
 
@@ -163,6 +164,7 @@ class River:
             Additional scaling factor
         """
         self.name = name
+        self.metadata = None
 
         # Handle string / Path input (NetCDF)
         if isinstance(data, (str, Path)):
@@ -241,6 +243,32 @@ class River:
         plt.title(f'{self.name} Daily Discharge')
         plt.grid(True)
         plt.show()
+
+    @classmethod
+    def from_pickle(cls, pkl_path: Path, name: str = None, scaling: float = 1.0, q_col: str = "m3_s"):
+        """
+        Load a River object from a pickle saved by save_HBV_results.
+
+        Parameters
+        ----------
+        pkl_path : Path
+            Path to the pickle file
+        name : str, optional
+            River name; if None, will use name from metadata or "Unnamed"
+        scaling : float, optional
+            Scaling factor applied to discharge
+        q_col : str, optional
+            Column name in the DataFrame that contains discharge values
+        """
+        with open(pkl_path, "rb") as f:
+            payload = pickle.load(f)
+        df = payload["data"]
+        river_name = name or payload["metadata"].get("name", "Unnamed")
+        river = cls(df, q_col=q_col, name=river_name, scaling=scaling)
+        river.metadata = payload["metadata"]
+        return river
+
+
 
 class MultiRiver:
     def __init__(self, rivers, q_col=None, factor: float = 86400/1e9, scaling: float = 1):
@@ -379,7 +407,9 @@ def run_connected_aral_model(
     ahv_csv: str,              # path to A-H-V CSV file with columns: elevation_m, volume_km3, area_km2
     V0_km3: float = 1100,       # initial lake volume [km3]
     start_time=None,  # optional: datetime-like string or pd.Timestamp
-    end_time=None     # optional: datetime-like string or pd.Timestamp
+    end_time=None,     # optional: datetime-like string or pd.Timestamp
+    show_progress: bool = True,
+    tqdm_position: int = 0,
 )-> pd.DataFrame:
     """
     Connected Aral Sea daily water balance model.
@@ -426,26 +456,25 @@ def run_connected_aral_model(
     V.iloc[0] = V0_km3
     geom = LakeGeometry(ahv_csv)
 
-    for i in tqdm(range(1, n), desc = "Simulating Aral Sea volume balance"):
+    it = range(1, n)
+    if show_progress:
+        it = tqdm(it, desc="Simulating Aral Sea volume balance", position=tqdm_position, leave=False)
+
+    for i in it:
         # Geometry
         A.iloc[i] = geom.area_from_volume(V.iloc[i-1])
         H.iloc[i] = geom.elevation_from_volume(V.iloc[i-1])
 
-        # Total river inflow from all River objects
+        # Total river inflow
         Q_in = compute_total_river_inflow(i, rivers)
         Q_in_series.iloc[i] = Q_in
 
         # Evaporation
-        evap = compute_evaporation_km3day(
-            aral_meteo["evspsblpot"].isel(time=i).values,
-            A.iloc[i]
-        )
+        evap = compute_evaporation_km3day(aral_meteo["evspsblpot"].isel(time=i).values, A.iloc[i])
         evap_series.iloc[i] = evap
 
         # Update volume
-        V.iloc[i] = update_volume(
-            V.iloc[i-1], Q_in, evap
-        )
+        V.iloc[i] = update_volume(V.iloc[i-1], Q_in, evap)
 
     return pd.DataFrame({
         "time": aral_meteo.time.values[:n],
@@ -457,24 +486,29 @@ def run_connected_aral_model(
     })
 
 
-def plot_aral_results(results, labels=None):
+def plot_aral_results(results, labels=None, observations=None):
     """
-    Plot one or more Aral Sea simulation results side-by-side.
+    Plot one or more Aral Sea simulation results side-by-side, optionally with observations.
 
     Parameters
     ----------
     results : pandas.DataFrame or list of pandas.DataFrame
-        Single DataFrame or a list of DataFrames containing simulation results.
-        Each DataFrame must have columns:
+        Single simulation or a list of simulation results. Must contain:
         'time', 'volume_km3', 'elevation_m', 'area_km2'
     labels : list of str, optional
         Labels for each simulation. If None, default labels will be used.
+    observations : list of tuples (df, label), optional
+        Observation datasets to overlay. Each tuple: (DataFrame, label)
+        DataFrame must have columns 'time' and 'elevation_m'
 
     Returns
     -------
     None
         Displays a matplotlib figure.
     """
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+
     # Ensure results is a list
     if not isinstance(results, list):
         results = [results]
@@ -498,6 +532,20 @@ def plot_aral_results(results, labels=None):
         axs[1].plot(df['time'], df['elevation_m'], label=label, color=color)
         axs[2].plot(df['time'], df['area_km2'], label=label, color=color)
 
+    # Plot observations if provided
+    if observations is not None:
+        for obs in observations:
+            # obs can be tuple (df, label)
+            if isinstance(obs, tuple):
+                df_obs, obs_label = obs
+            elif isinstance(obs, pd.DataFrame):
+                df_obs, obs_label = obs, "Observation"
+            else:
+                continue  # skip invalid
+
+            # Only plot elevation for observations
+            axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25, label=obs_label)
+
     # Set titles and labels
     axs[0].set_ylabel('Volume (km³)')
     axs[0].set_title('Aral Sea Volume')
@@ -511,7 +559,95 @@ def plot_aral_results(results, labels=None):
         ax.grid(True)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-        ax.legend()  # show legend for multiple simulations
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
+    """
+    Plot ensemble Aral Sea simulation results with optional observations.
+
+    Parameters
+    ----------
+    sim_results : list of pd.DataFrame
+        List of simulation outputs from run_connected_aral_model.
+        Each DataFrame must have columns: 'time', 'volume_km3', 'area_km2', 'elevation_m'.
+    groups : list of str, optional
+        Same length as sim_results. Group label for each simulation,
+        e.g., ["ERA5"]*10 + ["CMIP"]*10.
+        All simulations in the same group get the same color.
+    observations : list of tuples (df, label), optional
+        Observation datasets to overlay. Each tuple: (DataFrame, label)
+        DataFrame must have columns 'time' and 'elevation_m'
+
+    """
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+
+    if not isinstance(sim_results, list):
+        sim_results = [sim_results]
+
+    n_sims = len(sim_results)
+
+    # Default groups
+    if groups is None:
+        groups = ["Sim"] * n_sims
+
+    unique_groups = list(dict.fromkeys(groups))
+    cmap = plt.cm.tab10
+    group_colors = {g: cmap(i % 10) for i, g in enumerate(unique_groups)}
+
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+    # Plot each simulation
+    for df, group in zip(sim_results, groups):
+        color = group_colors[group]
+        axs[0].plot(df['time'], df['volume_km3'], color=color, linewidth=1, alpha=0.7)
+        axs[1].plot(df['time'], df['elevation_m'], color=color, linewidth=1, alpha=0.7)
+        axs[2].plot(df['time'], df['area_km2'], color=color, linewidth=1, alpha=0.7)
+
+    # Plot observations if provided (on elevation subplot only)
+    if observations is not None:
+        plotted_labels = set()
+        for obs in observations:
+            if isinstance(obs, tuple):
+                df_obs, obs_label = obs
+            elif isinstance(obs, pd.DataFrame):
+                df_obs, obs_label = obs, "Historical"
+            else:
+                continue
+
+            # Only plot once per label
+            if obs_label in plotted_labels:
+                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25)
+            else:
+                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25, label=obs_label)
+                plotted_labels.add(obs_label)
+
+    # Set titles and labels
+    axs[0].set_title("Aral Sea Volume (km³)")
+    axs[0].set_ylabel("Volume (km³)")
+    axs[1].set_title("Aral Sea Elevation (m)")
+    axs[1].set_ylabel("Elevation (m)")
+    axs[2].set_title("Aral Sea Area (km²)")
+    axs[2].set_ylabel("Area (km²)")
+
+    for ax in axs:
+        ax.set_xlabel("Time")
+        ax.grid(True)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+
+    # Legends
+    for ax in axs:
+        # Ensemble group legend
+        for group, color in group_colors.items():
+            ax.plot([], [], color=color, label=group)
+        ax.legend()
+
+    plt.setp(axs[0].get_xticklabels(), rotation=45, ha='right')
+    plt.setp(axs[1].get_xticklabels(), rotation=45, ha='right')
+    plt.setp(axs[2].get_xticklabels(), rotation=45, ha='right')
 
     plt.tight_layout()
     plt.show()

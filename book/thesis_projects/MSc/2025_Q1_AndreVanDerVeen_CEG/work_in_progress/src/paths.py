@@ -52,7 +52,7 @@ NOTEBOOKS = ROOT / "notebooks"
 # Model Runs (intermediate folders)
 # ------------------------------
 MODEL_RUNS = ROOT / "model_runs"
-RUNS_HBV = MODEL_RUNS / "hbv"
+RUNS_HBV = MODEL_RUNS / "HBV"
 RUNS_LB = MODEL_RUNS / "leakybucket"
 RUNS_PCR = MODEL_RUNS / "pcrglobwb"
 INI_FILES = RUNS_PCR / "ini_files"

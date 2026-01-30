@@ -109,7 +109,7 @@ def plot_HBV_output(model_output: pd.Series):
     plt.show()
 
 
-def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str): 
+def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str, run_tag: str = None,parameters: dict = None): 
     """
     Save HBV model output as CSV, NetCDF, and pickle.
     Also converts results to m3/s using shapefile
@@ -141,26 +141,54 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
 
     # generate name
     base_filename = f"{shape_name}_{forcing_type}_{start_year}-{end_year}"
+    
+    if run_tag is not None:
+        base_filename = f"{base_filename}_{run_tag}"
 
     # Save CSV (mm/day
     csv_file = output_dir / f"{base_filename}.csv"
     df.to_csv(csv_file, index_label="time")
 
-    # Save as pickle
+    # Save as pickle (data + metadata)
     pkl_file = output_dir / f"{base_filename}.pkl"
+
+    payload = {
+        "data": df,
+        "metadata": {
+            "shape_name": shape_name,
+            "forcing_type": forcing_type,
+            "run_tag": run_tag,
+            "start_year": start_year,
+            "end_year": end_year,
+            "parameters": parameters,
+        },
+    }
+
     with open(pkl_file, "wb") as f:
-        pickle.dump(df, f)
+        pickle.dump(payload, f)
 
     # Save as netcdf
     ds = xr.Dataset({
         "discharge_mm_day": ("time", model_output.values, {"units": "mm/day"}),
         "discharge_m3_s": ("time", model_output_m3.values, {"units": "m3/s"})
     }, coords={"time": model_output.index})
+
+    #metadata
+    ds.attrs.update({
+        "shape_name": shape_name,
+        "forcing_type": forcing_type,
+        "run_tag": run_tag,
+        "start_year": start_year,
+        "end_year": end_year,
+    })
+
+    if parameters is not None:
+        for name, value in parameters.items():
+            ds.attrs[f"param_{name}"] = float(value)
     nc_file = output_dir / f"{base_filename}.nc"
+
     ds.to_netcdf(nc_file)
-
     
-
     return {"csv": csv_file, "pkl": pkl_file, "nc": nc_file}
 
 def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
