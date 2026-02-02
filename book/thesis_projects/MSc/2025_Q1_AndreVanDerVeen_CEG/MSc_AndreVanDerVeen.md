@@ -1,5 +1,15 @@
 # Aral Sea - Andre van der Veen
-A Python-based framework for assessing climate change impacts on river discharge in Central Asian basins, with a focus on the Aral Sea catchment area. Developed as part of a Master's thesis in Hydrology.
+This repository contains the Python-based framework developed as part of my Master’s thesis in Hydrology at TU Delft. It focuses on assessing the combined effects of climate change and human activities on the water balance and river discharge of the Aral Sea basin.
+
+The project includes:
+
+* Data processing workflows for meteorological forcing and hydrological observations.
+
+* Hydrological modeling tools for simulating river discharge, lake volume, and water balance components.
+
+* Scenario analyses to explore the impacts of different climate and water management conditions.
+
+While the framework is tailored to the Aral Sea, parts of the workflows and tools are designed to be reusable for other river basins or hydrological studies.
 
 - [Overview](#overview)
 - [Contact](#contact)
