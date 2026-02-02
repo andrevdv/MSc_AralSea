@@ -620,9 +620,9 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
 
             # Only plot once per label
             if obs_label in plotted_labels:
-                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25)
+                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='.', color='k', s=25)
             else:
-                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25, label=obs_label)
+                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='.', color='k', s=25, label=obs_label)
                 plotted_labels.add(obs_label)
 
     # Set titles and labels

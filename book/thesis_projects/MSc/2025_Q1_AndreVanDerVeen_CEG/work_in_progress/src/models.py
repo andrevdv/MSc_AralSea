@@ -22,7 +22,8 @@ from tqdm.notebook import tqdm
 from src.paths import INI_FILES, OUTPUT_HBV
 from src.utils import catchment_area_from_shapefile, mmday_to_m3s
 from src.paths import PCR_GLOBAL_PARAMS
-from src.constants import HBV_PARAM_BOUNDS
+from src.constants import HBV_PARAM_BOUNDS, PARAMETER_NAMES
+from src.forcing import load_lumped_forcing_data
 
 def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
     """
@@ -797,6 +798,129 @@ def wrap_objective_safe(forcing, q_obs, shape_name):
     def objective(theta_norm, history):
         return objective_safe(theta_norm, forcing, q_obs, shape_name, history)
     return objective
+
+
+def run_hbv_for_best_params(
+    shapefile: str,
+    forcing_type: str,
+    year_span: str,
+    params_path: Path,
+    initial_conditions: dict,
+    leave_pbar: bool = False,
+    delete_files: bool = True
+):
+    """
+    Load best parameter sets from a pickle file and run HBV simulations.
+
+    Parameters
+    ----------
+    shapefile : str
+        Path to the catchment shapefile.
+    forcing_type : str
+        Meteorological forcing type (e.g., 'ERA5').
+    year_span : str
+        Simulation years, e.g., '1940-2020'.
+    params_path : Path
+        Path to the pickle file containing best parameters dataframe.
+    initial_conditions : dict
+        Initial conditions for the model.
+    leave_pbar : bool, optional
+        Whether to leave the progress bar visible.
+    delete_files : bool, optional
+        Whether to delete temporary files after simulation.
+
+    Returns
+    -------
+    list of dict
+        Simulation results and parameters for each parameter set.
+    """
+    # Load best parameters
+    best_params_df = pd.read_pickle(params_path)
+    parameter_sets = best_params_df[PARAMETER_NAMES].to_numpy().tolist()
+
+    # Run HBV simulations using the previous helper function
+    results = run_hbv_simulations(
+        shapefile=shapefile,
+        forcing_type=forcing_type,
+        year_span=year_span,
+        parameter_sets=parameter_sets,
+        initial_conditions=initial_conditions,
+        leave_pbar=leave_pbar,
+        delete_files=delete_files
+    )
+
+    return results
+
+def run_hbv_simulations(
+    shapefile: str,
+    forcing_type: str,
+    year_span: str,
+    parameter_sets: list,
+    initial_conditions: dict,
+    leave_pbar: bool = False,
+    delete_files: bool = True,
+):
+    """
+    Run HBV simulations for a given catchment and set of parameter sets.
+
+    Parameters
+    ----------
+    shapefile : str
+        Path to the shapefile for the catchment.
+    forcing_type : str
+        Meteorological forcing type (e.g., 'ERA5').
+    year_span : str
+        Years to simulate, e.g., '1940-2020'.
+    parameter_sets : list of lists
+        Each inner list contains a set of HBV parameters.
+    initial_conditions : dict
+        Initial conditions for the model.
+    leave_pbar : bool, optional
+        Whether to leave the progress bar visible. Default is False.
+    delete_files : bool, optional
+        Whether to delete temporary files after simulation. Default is True.
+
+    Returns
+    -------
+    list of dict
+        List of results for each parameter set. Each item contains the
+        simulation output and associated parameter dictionary.
+    """
+    # Load forcing
+    forcing = load_lumped_forcing_data(
+        shape_name=shapefile,
+        forcing_type=forcing_type,
+        year_span=year_span
+    )
+
+    all_results = []
+
+    for i, parameter_set in enumerate(parameter_sets):
+        simulatie = simulate_HBV(
+            forcing,
+            parameter_set=parameter_set,
+            initial_conditions=initial_conditions,
+            leave_pbar=leave_pbar,
+            delete_files=delete_files,
+        )
+
+        parameters = dict(zip(PARAMETER_NAMES, parameter_set))
+
+        save_HBV_results(
+            simulatie,
+            shape_name=shapefile,
+            forcing_type=forcing_type,
+            run_tag=f"cmaes_{i:03d}",
+            parameters=parameters
+        )
+
+        all_results.append({
+            "simulation": simulatie,
+            "parameters": parameters,
+        })
+
+    return all_results
+
 
 
 
