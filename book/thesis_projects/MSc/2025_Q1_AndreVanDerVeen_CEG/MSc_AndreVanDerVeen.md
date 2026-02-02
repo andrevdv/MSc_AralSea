@@ -1,5 +1,5 @@
-# Aral Sea - Andre van der Veen
-This repository contains the Python-based framework developed as part of my Master’s thesis in Hydrology at TU Delft. It focuses on assessing the combined effects of climate change, future climate projections, and human activities on the water balance and river discharge of the Aral Sea basin.
+# Aral Sea - André van der Veen
+This repository contains the Python-based toolkit and workflow developed as part of my Master’s thesis in Hydrology at TU Delft. It focuses on assessing the combined effects of climate change, future climate projections, and human activities on the water balance and river discharge of the Aral Sea basin.
 
 The project includes:
 
