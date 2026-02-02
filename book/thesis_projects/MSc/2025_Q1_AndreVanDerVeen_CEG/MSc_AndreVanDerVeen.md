@@ -30,6 +30,11 @@ Other main folders:
 ## Examples
 
 ## Contact
+**Author:** [Andre van der Veen](https://github.com/andrevdv)  
+**Institution:** [TU Delft](https://www.tudelft.nl/)  
+**Project Link:** [Aral Sea Hydrology Thesis](https://github.com/andrevdv/MSc_AralSea)
+
+
 
 
 ## Abstract
