@@ -8,22 +8,22 @@ A Python-based framework for assessing climate change impacts on river discharge
 
 
 ## Overview
-## Folder Structure
-python soure  code lives in the relevant .py files in /src/ for example forcing.py for evertying forcing related and models.py for anything model related. These also contain 2 files, paths.py and constants.py that 
+Python source code lives in [`/src/`](./work_in_progress/src/) in modular `.py` files:
 
-The rest of the folders are /data/, /forcing/, /outputs/, /notebooks/ and /model_runs/
+- [`forcing.py`](./work_in_progress/src/forcing.py) – everything related to meteorological forcing
+- [`models.py`](./work_in_progress/src/models.py) – functions for simulating hydrological models
+- [`paths.py`](./work_in_progress/src/paths.py) – file to standardize paths used in the work
+- [`constants.py`](./work_in_progress/src/constants.py) – physical constants and model parameters
+etc
 
-src/
-├── forcing.py
-├── models.py
-├── paths.py
-├── constants.py
-└── ...                # Additional helper scripts
-data/
-forcing/
-outputs/
-notebooks/
-model_runs/
+Other main folders:
+
+- [`/data/`](./work_in_progress/data/) – raw and processed input data
+- [`/forcing/`](./work_in_progress/forcing/) – meteorological forcing generation and storage
+- [`/outputs/`](./work_in_progress/outputs/) – generated outputs (time series, plots, figures, analysis)
+- [`/notebooks/`](./work_in_progress/notebooks/) – Jupyter notebooks for analysis and visualization
+- [`/model_runs/`](./work_in_progress/model_runs/) – model runs for scenario analysis
+
 
 
 
