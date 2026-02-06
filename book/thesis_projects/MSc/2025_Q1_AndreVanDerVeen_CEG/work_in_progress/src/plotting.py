@@ -23,6 +23,8 @@ import cartopy.feature as cfeature
 from cartopy.feature import ShapelyFeature, BORDERS, LAKES, RIVERS, COASTLINE, OCEAN
 from cartopy.io.shapereader import Reader
 
+import pandas as pd
+
 # Local modules
 from src.paths import SHAPEFILES
 from src.utils import compute_koppen_class_counts, generate_koppen_tables, get_integer_multiple_bounds, get_combined_extent, KOPPEN_DESCRIPTION,extract_scenario_and_year
@@ -634,7 +636,7 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
 
 def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None,
                           plot_map=True, plot_hist=True, generate_table=True,
-                          save_dir=None, show_plot=False):
+                          save_dir=None, show_plot=False, return_fig=False):
     """
     High-level wrapper: compute counts, plot raster map, histograms, and generate tables.
 
@@ -686,6 +688,7 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     hist_file = analysis_dir  / f"koppen_hist_{suffix}.png"
     tex_file = analysis_dir  / f"koppen_table_{suffix}.tex"
     md_file = analysis_dir  / f"koppen_table_{suffix}.md"
+    pkl_file = analysis_dir / f"koppen_table_{suffix}.pkl"
 
 
     # --- Map ---
@@ -708,7 +711,7 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             save_dir=analysis_dir,
             prefix=suffix,
             show_plot=show_plot,
-            title_prefix=f"Köppen-Geiger Class Distribution ({year_range}" + (f", {scenario}" if scenario else "") + ")",
+            title_prefix=f"Köppen-Geiger Class Distribution ({year_range_str}" + (f", {scenario}" if scenario else "") + ")",
         )
 
     # --- Table ---
@@ -718,13 +721,86 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             koppen_description=koppen_description,
             save_tex=tex_file,
             save_md=md_file,
+            save_pkl=pkl_file,
             caption=caption,
             label=label,
             
         )
 
-    return fig, ax, df_percent, top_df
+    # --- Return ---
+    if return_fig:
+        return fig, ax, df_percent, top_df
+    else:
+        return df_percent, top_df
 
+def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="1991_2020"):
+    """
+    Plot HIST and SSP lines for a given climate class over time.
 
+    Parameters
+    ----------
+    topdf_all : pd.DataFrame
+        Concatenated topdf_all DataFrame with columns:
+        - climate_class
+        - period
+        - ssp
+        - year_start
+        - Plotted Area
+        - description
+    climate_class : str
+        Köppen-Geiger climate class to plot, e.g., "Cfb".
+    hist_ref_period : str, optional
+        Period row in HIST data to use as reference for SSPs, default "1991_2020".
+
+    Returns
+    -------
+    fig, ax : matplotlib Figure and Axes
+    """
+    # HIST dataframe
+    hist_df = topdf_all[topdf_all["ssp"] == "HIST"].copy()
+    
+    # future SSPs
+    ssps = topdf_all["ssp"].unique()
+    ssps = [s for s in ssps if s != "HIST"]
+    future_df = topdf_all[topdf_all["ssp"].isin(ssps)].copy()
+    
+    # HIST reference row
+    hist_ref = hist_df[hist_df["period"] == hist_ref_period].copy()
+    
+    combined_ssp = []
+    for ssp in ssps:
+        df_ssp = future_df[future_df["ssp"] == ssp].copy()
+        # add HIST reference
+        hist_point = hist_ref.copy()
+        hist_point["ssp"] = ssp
+        df_ssp = pd.concat([hist_point, df_ssp], ignore_index=True)
+        combined_ssp.append(df_ssp)
+    
+    # all SSP lines combined
+    ssp_plot_df = pd.concat(combined_ssp, ignore_index=True)
+    ssp_plot_df = ssp_plot_df.sort_values(["ssp", "year_start"])
+    
+    # Grab description
+    desc = topdf_all.loc[topdf_all["climate_class"] == climate_class, "description"].iloc[0]
+    
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    
+    # HIST line
+    hist_line = hist_df[hist_df["climate_class"] == climate_class].sort_values("year_start")
+    ax.plot(hist_line["year_start"], hist_line["Plotted Area"], color="black", marker="o", label="HIST", zorder=20)
+    
+    # SSP lines
+    for ssp, g in ssp_plot_df[ssp_plot_df["climate_class"] == climate_class].groupby("ssp"):
+        ax.plot(g["year_start"], g["Plotted Area"], marker="o", label=ssp)
+    
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Area (%)")
+    ax.set_title(f"{climate_class} ({desc}) area fraction over time")  
+    ax.legend(title="Scenario")
+    ax.grid(linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    
+    return fig, ax
 
 

@@ -140,3 +140,58 @@ PCRGLOBWB_ESMVALTOOL_PADDING = 2 # degrees, padding for forcing extraction
 # Aral Sea Model Constants
 # ==============================================================================
 MAKKINK_FACTOR = 1.15 # Makkink correction factor (dimensionless) for open water evaporation estimation
+
+
+# ==============================================================================
+# Koppen-Geiger
+# ==============================================================================
+KOPPEN_CLASSES = [
+    "Af","Am","Aw","BWh","BWk","BSh","BSk",
+    "Csa","Csb","Csc","Cwa","Cwb","Cwc",
+    "Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
+    "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd",
+    "ET","EF"
+]
+
+KOPPEN_RGB_COLORS = np.array([
+    [0, 0, 255], [0, 120, 255], [70, 170, 250], [255, 0, 0], [255, 150, 150],
+    [245, 165, 0], [255, 220, 100], [255, 255, 0], [200, 200, 0], [150, 150, 0],
+    [150, 255, 150], [100, 200, 100], [50, 150, 50], [200, 255, 80], [100, 255, 80],
+    [50, 200, 0], [255, 0, 255], [200, 0, 200], [150, 50, 150], [150, 100, 150],
+    [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
+    [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
+], dtype=float) / 255
+
+KOPPEN_DESCRIPTION = {
+    "Af": "Tropical rainforest",
+    "Am": "Tropical monsoon",
+    "Aw": "Tropical savanna",
+    "BWh": "Hot desert",
+    "BWk": "Cold desert",
+    "BSh": "Hot steppe",
+    "BSk": "Cold steppe",
+    "Csa": "Mediterranean, hot summer",
+    "Csb": "Mediterranean, warm summer",
+    "Csc": "Mediterranean, cold summer",
+    "Cwa": "Temperate, dry winter, hot summer",
+    "Cwb": "Temperate, dry winter, warm summer",
+    "Cwc": "Temperate, dry winter, cold summer",
+    "Cfa": "Temperate, no dry season, hot summer",
+    "Cfb": "Temperate, no dry season, warm summer",
+    "Cfc": "Temperate, no dry season, cold summer",
+    "Dsa": "Snow, dry summer, hot summer",
+    "Dsb": "Snow, dry summer, warm summer",
+    "Dsc": "Snow, dry summer, cold summer",
+    "Dsd": "Snow, dry summer, very cold summer",
+    "Dwa": "Snow, dry winter, hot summer",
+    "Dwb": "Snow, dry winter, warm summer",
+    "Dwc": "Snow, dry winter, cold summer",
+    "Dwd": "Snow, dry winter, very cold winter",
+    "Dfa": "Snow, no dry season, hot summer",
+    "Dfb": "Snow, no dry season, warm summer",
+    "Dfc": "Snow, no dry season, cold summer",
+    "Dfd": "Snow, no dry season, very cold winter",
+    "ET": "Tundra",
+    "EF": "Ice cap"
+}
+

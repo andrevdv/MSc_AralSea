@@ -634,6 +634,7 @@ def generate_koppen_tables(
         top_n=10,
         save_tex=None,
         save_md=None,
+        save_pkl=None,
         caption=None,
         label=None,
     ):
@@ -675,10 +676,6 @@ def generate_koppen_tables(
             [koppen_description.get(idx, "Other classes") for idx in top_df.index]
         )
 
-    # # --- Add "(%)" to percentage columns ---
-    # cols = top_df.columns.tolist()
-    # top_df.columns = [cols[0]] + [f"{col} (%)" for col in cols[1:]]
-
     # Save LaTeX
     if save_tex:
         latex_table = top_df.to_latex(
@@ -694,7 +691,7 @@ def generate_koppen_tables(
         with open(save_tex, "w") as f:
             f.write(latex_table)
 
-        # --- Save Markdown ---
+    # --- Save Markdown ---
     if save_md:
         top_df = top_df.reset_index()  # move index into a column
         top_df.rename(columns={"index": "Climate code"}, inplace=True)
@@ -733,6 +730,9 @@ def generate_koppen_tables(
         # Save to file
         with open(save_md, "w", encoding="utf-8") as f:
             f.write(markdown_table)
+
+    if save_pkl:
+        df_percent.to_pickle(save_pkl)
 
     return top_df
 
@@ -785,5 +785,80 @@ def extract_scenario_and_year(path):
     year_index = parts.index(year_range)
     scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
     return year_range, scenario
+
+from pathlib import Path
+import pandas as pd
+from src.constants import KOPPEN_DESCRIPTION
+
+def load_koppen_pickles_from_folder(pkl_folder):
+    """
+    Load all Köppen-Geiger pickle outputs from a folder, add period, SSP, year, and description.
+
+    Parameters
+    ----------
+    pkl_folder : str or Path
+        Path to folder containing pickle files for one shapefile.
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated DataFrame with columns:
+        - climate_class
+        - period
+        - ssp
+        - year_start
+        - year_middle
+        - description
+        - original percentage columns
+    """
+    pkl_folder = Path(pkl_folder)
+    all_topdfs = []
+
+    # find all .pkl files
+    for pkl_file in sorted(pkl_folder.rglob("koppen_table_*.pkl")):
+        df = pd.read_pickle(pkl_file)
+
+        # Ensure climate_class is a column
+        df = df.copy()
+        df["climate_class"] = df.index
+
+        # Extract period and ssp from folder name
+        parent_name = pkl_file.parents[0].name
+
+        if "ssp" in parent_name.lower():
+            period_part, ssp_part = parent_name.split("_ssp")
+            period = period_part
+            ssp = f"SSP{ssp_part}"
+        else:
+            period = parent_name
+            ssp = "HIST"
+
+        df["period"] = period
+        df["ssp"] = ssp
+
+        all_topdfs.append(df)
+
+    # Concatenate
+    topdf_all = pd.concat(all_topdfs, ignore_index=True)
+
+    # Convert period to numeric years
+    def period_to_year(p):
+        return int(p.split("_")[0])
+
+    def period_to_year_middle(p):
+        start, end = p.split("_")
+        return (int(start) + int(end)) // 2
+
+    topdf_all["year_start"] = topdf_all["period"].apply(period_to_year)
+    topdf_all["year_middle"] = topdf_all["period"].apply(period_to_year_middle)
+
+    # Sort
+    topdf_all.sort_values(by=["year_start", "ssp", "climate_class"], inplace=True)
+
+    # Add description
+    topdf_all["description"] = topdf_all["climate_class"].map(KOPPEN_DESCRIPTION)
+
+    return topdf_all
+
 
 
