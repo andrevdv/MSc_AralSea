@@ -11,7 +11,7 @@ from pathlib import Path
 import xarray as xr
 from src.constants import MAKKINK_FACTOR
 from tqdm.notebook import tqdm
-from src.paths import GRDC
+from src.paths import GRDC,OUTPUT_HBV
 import pickle
 
 
@@ -243,6 +243,57 @@ class River:
         plt.title(f'{self.name} Daily Discharge')
         plt.grid(True)
         plt.show()
+    
+    def resample_5y_aligned(self, start_year: int, end_year: int, skipna=True) -> pd.DataFrame:
+        """
+        Compute yearly totals and then 5-year averages with aligned bins, returning a DataFrame.
+        Index = first year of the bin, label as separate column.
+
+        Parameters
+        ----------
+        start_year : int
+            First year of the first 5-year bin
+        end_year : int
+            Last year to consider for bins
+        skipna : bool
+            Whether to skip NaNs when aggregating
+
+        Returns
+        -------
+        pd.DataFrame
+            5-year average of yearly sums, index = first year of bin, 'bin_label' column included
+        """
+        # 1. Yearly totals
+        yearly_sum = self.Q.resample("YE").sum()
+        yearly_sum.index = yearly_sum.index.year  # convert to integer years
+
+        if skipna:
+            yearly_sum = yearly_sum.dropna()
+
+        # 2. Aligned 5-year bins
+        bins = list(range(start_year, end_year + 1, 5))
+        labels = [f"{b}-{b+4}" for b in bins[:-1]]
+
+        # 3. Group by bins
+        grouped = yearly_sum.groupby(
+            pd.cut(yearly_sum.index, bins=bins, labels=labels, right=True),
+            observed=False
+        )
+
+        # 4. Compute 5-year average
+        result = grouped.mean()
+
+        # 5. Convert to DataFrame
+        col_name = self.name or "River"
+        df = pd.DataFrame({col_name: result})
+
+        # 6. Add bin label as a separate column
+        df["bin_label"] = df.index.astype(str)
+
+        # 7. Change index to first year of the bin
+        df.index = [int(label.split("-")[0]) for label in df["bin_label"]]
+
+        return df
 
     @classmethod
     def from_pickle(cls, pkl_path: Path, name: str = None, scaling: float = 1.0, q_col: str = "m3_s"):
@@ -386,7 +437,7 @@ def update_volume(
     V_prev,
     Q_in,
     evap,
-    Q_gw=0.0,
+    Q_gw=(1/365),
     scale_inflow=1.0
 ):
     """
@@ -794,3 +845,33 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
 
     # Return River object
     return River(df, q_col=q_col, name=name)
+
+def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
+    """
+    Load River objects for a given station, both ERA5 and CMIP_HIST.
+    
+    Parameters
+    ----------
+    station_name : str
+        Folder name of the station inside OUTPUT_HBV.
+    scaling_era5 : float
+        Scaling factor for ERA5 pickles.
+    scaling_cmip : float
+        Scaling factor for CMIP_HIST pickles.
+        
+    Returns
+    -------
+    dict
+        Dictionary with keys 'ERA5' and 'CMIP_HIST', values are lists of aral.River objects.
+    """
+    station_dir = OUTPUT_HBV / station_name
+    
+    # ERA5
+    pkl_files_era5 = sorted(station_dir.glob(f"ERA5/{station_name}_ERA5_1940-2020_cmaes_*.pkl"))
+    rivers_era5 = [River.from_pickle(pkl, scaling=scaling_era5) for pkl in pkl_files_era5]
+    
+    # CMIP_HIST
+    pkl_files_cmip = sorted(station_dir.glob(f"CMIP_HIST/{station_name}_CMIP_HIST_1940-2014_cmaes_*.pkl"))
+    rivers_cmip = [River.from_pickle(pkl, scaling=scaling_cmip) for pkl in pkl_files_cmip]
+    
+    return {"ERA5": rivers_era5, "CMIP_HIST": rivers_cmip}

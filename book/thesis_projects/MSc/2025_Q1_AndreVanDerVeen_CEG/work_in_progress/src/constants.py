@@ -139,7 +139,7 @@ PCRGLOBWB_ESMVALTOOL_PADDING = 2 # degrees, padding for forcing extraction
 # ==============================================================================
 # Aral Sea Model Constants
 # ==============================================================================
-MAKKINK_FACTOR = 1.15 # Makkink correction factor (dimensionless) for open water evaporation estimation
+MAKKINK_FACTOR = 1.125 # Makkink correction factor (dimensionless) for open water evaporation estimation
 
 
 # ==============================================================================

@@ -60,3 +60,10 @@ INI_COMPARISON = INI_FILES / "comparison_files"
 
 PCR_TAIL = Path("work/diagnostic/script")
 LOAD_PCR = Path("ERA5_1940-1960/AralSea_basin")
+
+
+# ------------------------------
+# Specific Model Runs
+# ------------------------------
+
+PCR_TEST_ARAL = RUNS_PCR /"aral_sea_water_levels/pcrglobwb_20260210_112853/netcdf/discharge_dailyTot_output.nc"
