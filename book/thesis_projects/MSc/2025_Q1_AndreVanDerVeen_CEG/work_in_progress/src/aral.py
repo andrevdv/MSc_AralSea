@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pathlib import Path
 import xarray as xr
-from src.constants import MAKKINK_FACTOR
+from src.constants import MAKKINK_FACTOR,GROUNDWATER_INFLOW
 from tqdm.notebook import tqdm
-from src.paths import GRDC,OUTPUT_HBV
+from src.paths import GRDC,OUTPUT_HBV,BATHYMETRY,DAHITI
 import pickle
+import glob
+import os
 
 
 
@@ -220,7 +222,7 @@ class River:
         Q = self.Q.copy()
         if skipna:
             Q = Q.dropna()
-        yearly = Q.resample("Y").sum(min_count=1 if skipna else None)
+        yearly = Q.resample("YE").sum(min_count=1 if skipna else None)
         plt.figure(figsize=(10, 4))
         plt.bar(yearly.index.year, yearly.values, color='skyblue')
         plt.ylabel("Yearly Discharge (km³/yr)")
@@ -430,6 +432,34 @@ def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     evap_km3_day = MAKKINK_FACTOR * evap_km3_day
     return evap_km3_day
 
+def compute_precip_km3day(precip_mm_day, area_km2):
+    """
+    Convert potential precip flux to km3/day. very rudimenteray right now
+
+    TODO expand this.
+
+
+    Parameters
+    ----------
+    precip_mm_day : float
+        precip flux in mm day^-1
+    area_km2 : float
+        Lake area in km^2
+
+    Returns
+    -------
+    float
+        precip in km3/day
+    """
+    # kg/m²/s → mm/day
+    
+    # mm/day → km³/day
+    precip_km3_day = precip_mm_day / 1e6 * area_km2
+
+    # makkink conversion factor open water evaporation
+    #evap_km3_day = MAKKINK_FACTOR * evap_km3_day
+    return precip_km3_day
+
 
 
 ## Daily status update - Volume balance
@@ -437,8 +467,9 @@ def update_volume(
     V_prev,
     Q_in,
     evap,
-    Q_gw=(1/365),
-    scale_inflow=1.0
+    Q_gw=GROUNDWATER_INFLOW,
+    scale_inflow=1.0,
+    precip=0,
 ):
     """
     updates the volume for the volume balance model. rudimentary right now.
@@ -448,6 +479,7 @@ def update_volume(
         + scale_inflow * Q_in
         - Q_gw
         - evap
+        + precip
     )
     return max(V_new, 0.0)
 
@@ -461,6 +493,7 @@ def run_connected_aral_model(
     end_time=None,     # optional: datetime-like string or pd.Timestamp
     show_progress: bool = True,
     tqdm_position: int = 0,
+    aral_precip: xr.Dataset = None,  # xarray Dataset with meteo forcing, must containg [evspsblpot]
 )-> pd.DataFrame:
     """
     Connected Aral Sea daily water balance model.
@@ -503,6 +536,7 @@ def run_connected_aral_model(
     H = pd.Series(index=range(n), dtype=float)
     Q_in_series = pd.Series(index=range(n), dtype=float)
     evap_series = pd.Series(index=range(n), dtype=float)
+    precip_series = pd.Series(index=range(n),dtype = float)
 
     V.iloc[0] = V0_km3
     geom = LakeGeometry(ahv_csv)
@@ -520,12 +554,24 @@ def run_connected_aral_model(
         Q_in = compute_total_river_inflow(i, rivers)
         Q_in_series.iloc[i] = Q_in
 
+        if H.iloc[i] >= 64:
+            Q_in = 0
+
         # Evaporation
         evap = compute_evaporation_km3day(aral_meteo["evspsblpot"].isel(time=i).values, A.iloc[i])
         evap_series.iloc[i] = evap
 
+        # Precipitation
+        precip=0
+        if aral_precip:
+            precip = compute_precip_km3day(aral_precip["pr"].isel(time=i).values, A.iloc[i])
+        precip_series.iloc[i] = precip
+
         # Update volume
-        V.iloc[i] = update_volume(V.iloc[i-1], Q_in, evap)
+        V.iloc[i] = update_volume(V.iloc[i-1], Q_in, evap, precip= precip)
+
+
+            
 
     return pd.DataFrame({
         "time": aral_meteo.time.values[:n],
@@ -534,6 +580,7 @@ def run_connected_aral_model(
         "elevation_m": H,
         "Q_in_km3day": Q_in_series,
         "evap_km3day": evap_series,
+        "precip_km3day": precip_series,
     })
 
 
@@ -725,7 +772,7 @@ def plot_aral_fluxes(df):
     df_yearly = df.set_index("time").resample("YE").sum()
 
     # Net flux (inflow - evaporation)
-    df_yearly["net_flux"] = df_yearly["Q_in_km3day"] - df_yearly["evap_km3day"]
+    df_yearly["net_flux"] = df_yearly["Q_in_km3day"] + df_yearly["precip_km3day"] - df_yearly["evap_km3day"]
 
     # Determine shared y-axis limit for inflow and evaporation
     y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())
@@ -875,3 +922,56 @@ def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
     rivers_cmip = [River.from_pickle(pkl, scaling=scaling_cmip) for pkl in pkl_files_cmip]
     
     return {"ERA5": rivers_era5, "CMIP_HIST": rivers_cmip}
+
+
+def make_obs(): #csv_file: Path, nc_folder: Path):
+    """
+    Load historical CSV and DAHITI NetCDF water level observations
+    and return a list of tuples (DataFrame, label).
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    obs_list : list of tuples
+        Each tuple is (df, label), where df has columns ['time', 'elevation_m']
+    """
+    obs_list = []
+
+    csv_file = BATHYMETRY / "Nachtnebel_table.csv"
+    nc_folder = DAHITI
+
+
+    # ---------- CSV (historical table) ----------
+    if csv_file.exists():
+        df_csv = pd.read_csv(csv_file, sep=';', decimal=',')
+
+        if not {'Year', 'elevation'}.issubset(df_csv.columns):
+            raise ValueError(
+                f"CSV must contain columns 'Year' and 'elevation'. Found: {df_csv.columns}"
+            )
+
+        df_csv = df_csv[['Year', 'elevation']].copy()
+        df_csv['time'] = pd.to_datetime(df_csv['Year'], format='%Y')
+        df_csv['elevation_m'] = df_csv['elevation'].astype(float)
+
+        obs_list.append(
+            (df_csv[['time', 'elevation_m']], 'Historical')
+        )
+    else:
+        print(f"CSV file not found: {csv_file}")
+
+    # --- Load all DAHITI NetCDF files ---
+    nc_files = glob.glob(os.path.join(nc_folder, "**", "*.nc"), recursive=True)
+    print(f"Found {len(nc_files)} NetCDF files in {nc_folder}")
+
+    for nc_file in nc_files:
+        ds = xr.open_dataset(nc_file)
+        df_nc = pd.DataFrame({
+            "time": pd.to_datetime(ds['datetime'].values),
+            "elevation_m": ds['water_level'].values
+        })
+        obs_list.append((df_nc, 'Historical'))
+
+    return obs_list

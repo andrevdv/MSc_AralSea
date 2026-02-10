@@ -134,13 +134,21 @@ SSP_SCENARIOS = ["ssp126", "ssp245", "ssp585"] #these have the best data coverag
 PCRGLOBWB_RESOLUTION_MULTIPLE = 3 # degrees, for get_integer_multiple_bounds
 PCRGLOBWB_ESMVALTOOL_PADDING = 2 # degrees, padding for forcing extraction
 
+STATIONS_PCR = {
+    "Chatly": {"lat": 42.2, "lon": 60.2},
+    "Kazalinsk": {"lat": 45.7, "lon": 62.12},
+    "Kerki":{"lat": 37.83, "lon":65.25},
+    "Tyumen-Aryk": {"lat":43.95, "lon":67.05},
+    "Karaozek":{"lat": 44.95 , "lon":65.27},
+
+}
 
 
 # ==============================================================================
 # Aral Sea Model Constants
 # ==============================================================================
-MAKKINK_FACTOR = 1.125 # Makkink correction factor (dimensionless) for open water evaporation estimation
-
+MAKKINK_FACTOR = 1.15 # Makkink correction factor (dimensionless) for open water evaporation estimation
+GROUNDWATER_INFLOW = (1/365)
 
 # ==============================================================================
 # Koppen-Geiger
