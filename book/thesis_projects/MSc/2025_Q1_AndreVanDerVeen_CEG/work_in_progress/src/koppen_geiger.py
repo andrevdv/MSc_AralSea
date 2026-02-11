@@ -18,7 +18,7 @@ KOPPEN_DESCRIPTION : dict
 """
 
 
-# Standard library
+# Path library
 from pathlib import Path
 
 # Numerical / plotting
@@ -43,7 +43,7 @@ from cartopy.io.shapereader import Reader
 
 import pandas as pd
 
-from src.paths import SHAPEFILES
+#from src.paths import SHAPEFILES
 
 
 import re
@@ -238,7 +238,9 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
     # --- Load raster ---
     import rasterio
     with rasterio.open(path_to_file) as src:
-        data = src.read(1)
+        window = src.window(lon_min, lat_min, lon_max, lat_max)   #don't need to load the whole thing
+        data = src.read(1, window=window)
+        #data = src.read(1)
 
 
     # --- Defaults ---
@@ -255,7 +257,7 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
     ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
     ax.imshow(data, cmap=cmap, norm=norm, origin="upper",
-              extent=[-180, 180, -90, 90], transform=ccrs.PlateCarree())
+              extent=[lon_min, lon_max, lat_min, lat_max], transform=ccrs.PlateCarree())
 
 
 
@@ -376,7 +378,7 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
 
 
 
-def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="1991_2020"):
+def plot_climate_class_timeseries(topdf_all, climate_class, column_name="Plotted Area", hist_ref_period="1991_2020", plot_period="year_middle"):
     """
     Plot HIST and SSP lines for a given climate class over time.
 
@@ -431,15 +433,15 @@ def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="199
     
     # HIST line
     hist_line = hist_df[hist_df["climate_class"] == climate_class].sort_values("year_start")
-    ax.plot(hist_line["year_start"], hist_line["Plotted Area"], color="black", marker="o", label="HIST", zorder=20)
+    ax.plot(hist_line[plot_period], hist_line[column_name], color="black", marker="o", label="HIST", zorder=20)
     
     # SSP lines
     for ssp, g in ssp_plot_df[ssp_plot_df["climate_class"] == climate_class].groupby("ssp"):
-        ax.plot(g["year_start"], g["Plotted Area"], marker="o", label=ssp)
+        ax.plot(g[plot_period], g[column_name], marker="o", label=ssp)
     
     ax.set_xlabel("Year")
     ax.set_ylabel("Area (%)")
-    ax.set_title(f"{climate_class} ({desc}) area fraction over time")  
+    ax.set_title(f"{climate_class} ({desc}) area fraction over time for {column_name}")  
     ax.legend(title="Scenario")
     ax.grid(linestyle='--', alpha=0.5)
     plt.tight_layout()
@@ -472,33 +474,30 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
     path_to_file = Path(path_to_file)
     class_names = class_names or KOPPEN_CLASSES
 
-    with rasterio.open(path_to_file) as src:
-        nodata = src.nodata  # ALWAYS get nodata, it is the value the map uses as NoData 
-
-        data = src.read(1)
-
-        if extent is not None:
-            lon_min, lat_min, lon_max, lat_max = extent
-            # Convert lon/lat to row/col indices
-            row_start, col_start = src.index(lon_min, lat_max)  # upper-left
-            row_stop, col_stop = src.index(lon_max, lat_min)    # lower-right
-
-            # Ensure indices are within raster bounds
-            row_start = max(0, row_start)
-            row_stop = min(src.height, row_stop)
-            col_start = max(0, col_start)
-            col_stop = min(src.width, col_stop)
-
-            # Slice the array
-            data = data[row_start:row_stop, col_start:col_stop]
-    flat_data = data.flatten()
-    if nodata is not None:
-        flat_data = flat_data[flat_data != nodata]
-
     df_counts = pd.DataFrame(index=class_names)
-    df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+    #df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
 
-    # --- Shapefile counts ---
+    with rasterio.open(path_to_file) as src:
+        nodata = src.nodata  # ALWAYS get nodata, it is the value the map uses as NoData (sea etc)
+
+    if extent:
+        lon_min, lat_min, lon_max, lat_max = extent
+
+        with rasterio.open(path_to_file) as src:        #read only the extent
+            window = src.window(lon_min, lat_min, lon_max, lat_max)
+            data = src.read(1, window=window)
+
+        flat_data = data.flatten()                      #remove the NoData
+        if nodata is not None:
+            flat_data = flat_data[flat_data != nodata]
+
+        df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+
+        # OPTIMIZATION: delete data
+        del data, flat_data
+        gc.collect()
+    
+        # --- Shapefile counts ---
     if shapefiles:
         for label, cfg in shapefiles.items():
             with fiona.open(cfg["path"]) as shp:                 #open the shapefiles
@@ -513,11 +512,68 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
 
             df_counts[label] = [np.sum(masked_flat == i+1) for i in range(len(class_names))]  #count number of cells for each climate class
 
-            del masked, masked_flat #fix memory leak issues
-    # --- Percentages ---
+            del masked, masked_flat, geoms #fix memory leak issues
+            gc.collect()
+
     df_percent = df_counts.div(df_counts.sum(axis=0), axis=1) * 100
 
     return df_counts, df_percent
+
+
+
+        
+
+        
+
+
+
+
+    # with rasterio.open(path_to_file) as src:
+    #     nodata = src.nodata  # ALWAYS get nodata, it is the value the map uses as NoData 
+
+    #     data = src.read(1)
+
+    #     if extent is not None:
+    #         lon_min, lat_min, lon_max, lat_max = extent
+    #         # Convert lon/lat to row/col indices
+    #         row_start, col_start = src.index(lon_min, lat_max)  # upper-left
+    #         row_stop, col_stop = src.index(lon_max, lat_min)    # lower-right
+
+    #         # Ensure indices are within raster bounds
+    #         row_start = max(0, row_start)
+    #         row_stop = min(src.height, row_stop)
+    #         col_start = max(0, col_start)
+    #         col_stop = min(src.width, col_stop)
+
+    #         # Slice the array
+    #         data = data[row_start:row_stop, col_start:col_stop]
+    # flat_data = data.flatten()
+    # if nodata is not None:
+    #     flat_data = flat_data[flat_data != nodata]
+
+    # # df_counts = pd.DataFrame(index=class_names)
+    # # df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+
+    # # --- Shapefile counts ---
+    # if shapefiles:
+    #     for label, cfg in shapefiles.items():
+    #         with fiona.open(cfg["path"]) as shp:                 #open the shapefiles
+    #             geoms = [shape(feat["geometry"]) for feat in shp]  # list of Shapely geometries
+
+    #         with rasterio.open(path_to_file) as src:               #open the koppen-geiger map
+    #             masked, _ = rasterio.mask.mask(src, geoms, crop=True)   #keep only the pixels in the shapefile
+
+    #         masked_flat = masked[0].flatten()
+    #         if nodata is not None:
+    #             masked_flat = masked_flat[masked_flat != nodata]  #removes NoData
+
+    #         df_counts[label] = [np.sum(masked_flat == i+1) for i in range(len(class_names))]  #count number of cells for each climate class
+
+    #         del masked, masked_flat #fix memory leak issues
+    # # --- Percentages ---
+    # df_percent = df_counts.div(df_counts.sum(axis=0), axis=1) * 100
+
+    # return df_counts, df_percent
 
 def generate_koppen_tables(
         df_percent,
@@ -730,15 +786,20 @@ def load_koppen_pickles_from_folder(pkl_folder):
     topdf_all = pd.concat(all_topdfs, ignore_index=True)
 
     # Convert period to numeric years
-    def period_to_year(p):
+    def period_to_year_start(p):
         return int(p.split("_")[0])
 
     def period_to_year_middle(p):
         start, end = p.split("_")
         return (int(start) + int(end)) // 2
+    
+    def period_to_year_end(p):
+        return int(p.split("_")[1])
 
-    topdf_all["year_start"] = topdf_all["period"].apply(period_to_year)
+
+    topdf_all["year_start"] = topdf_all["period"].apply(period_to_year_start)
     topdf_all["year_middle"] = topdf_all["period"].apply(period_to_year_middle)
+    topdf_all["year_end"] = topdf_all["period"].apply(period_to_year_end)
 
     # Sort
     topdf_all.sort_values(by=["year_start", "ssp", "climate_class"], inplace=True)
