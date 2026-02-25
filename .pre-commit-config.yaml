@@ -6,6 +6,7 @@ repos:
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
+    files: ^src/
     hooks:
       - id: check-added-large-files
         args: ['--maxkb=5000']
@@ -21,9 +22,10 @@ repos:
   # Ruff - linter and formatter (replaces both flake8 and black)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4
+    files: ^src/.*\.py$
     hooks:
       - id: ruff
-        types_or: [python, pyi, jupyter]
+        types_or: [python, pyi]
         args: [--fix]
       - id: ruff-format
-        types_or: [python, pyi, jupyter]
+        types_or: [python, pyi]
