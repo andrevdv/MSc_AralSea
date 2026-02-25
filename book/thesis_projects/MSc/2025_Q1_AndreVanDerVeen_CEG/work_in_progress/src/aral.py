@@ -1,6 +1,7 @@
 """Aral Sea connected lake model.
 Based on daily water balance including river inflow and evaporation.
 """
+
 import glob
 import os
 import pickle
@@ -17,7 +18,7 @@ from src.constants import GROUNDWATER_INFLOW, MAKKINK_FACTOR
 from src.paths import BATHYMETRY, DAHITI, GRDC, OUTPUT_HBV
 
 
-#Geometry stuff, needs update later to account for separate north and south basins
+# Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
     """Represent the geometry of a lake using an area-height-volume (AHV) relationship.
 
@@ -33,6 +34,7 @@ class LakeGeometry:
     a_of_h : scipy.interpolate.interp1d
         Interpolation function for area (km²) as a function of elevation (m).
     """
+
     def __init__(self, ahv_csv):
         """Initialize LakeGeometry from an area-height-volume (AHV) CSV file.
 
@@ -54,21 +56,15 @@ class LakeGeometry:
         if not Path(ahv_csv).exists():
             raise FileNotFoundError(f"AHV file not found: {ahv_csv}")
 
-        df = pd.read_csv(ahv_csv, sep=';', decimal=',').sort_values("elevation_m")
+        df = pd.read_csv(ahv_csv, sep=";", decimal=",").sort_values("elevation_m")
         self.df = df  # Store the DataFrame for potential future use
 
         self.h_of_v = interp1d(
-            df["volume_km3"],
-            df["elevation_m"],
-            bounds_error=False,
-            fill_value="extrapolate"
+            df["volume_km3"], df["elevation_m"], bounds_error=False, fill_value="extrapolate"
         )
 
         self.a_of_h = interp1d(
-            df["elevation_m"],
-            df["area_km2"],
-            bounds_error=False,
-            fill_value="extrapolate"
+            df["elevation_m"], df["area_km2"], bounds_error=False, fill_value="extrapolate"
         )
 
     def elevation_from_volume(self, V_km3):
@@ -116,21 +112,21 @@ class LakeGeometry:
         df = self.df
 
         # 1. Area vs Height
-        axes[0].plot(df["elevation_m"], df["area_km2"], marker='o', color='tab:blue')
+        axes[0].plot(df["elevation_m"], df["area_km2"], marker="o", color="tab:blue")
         axes[0].set_xlabel("Height [m]")
         axes[0].set_ylabel("Area [km²]")
         axes[0].set_title("Area vs Height")
         axes[0].grid(True)
 
         # 2. Volume vs Height
-        axes[1].plot(df["elevation_m"], df["volume_km3"], marker='o', color='tab:green')
+        axes[1].plot(df["elevation_m"], df["volume_km3"], marker="o", color="tab:green")
         axes[1].set_xlabel("Height [m]")
         axes[1].set_ylabel("Volume [km³]")
         axes[1].set_title("Volume vs Height")
         axes[1].grid(True)
 
         # 3. Volume vs Area
-        axes[2].plot(df["area_km2"], df["volume_km3"], marker='o', color='tab:orange')
+        axes[2].plot(df["area_km2"], df["volume_km3"], marker="o", color="tab:orange")
         axes[2].set_xlabel("Area [km²]")
         axes[2].set_ylabel("Volume [km³]")
         axes[2].set_title("Volume vs Area")
@@ -139,8 +135,11 @@ class LakeGeometry:
         fig.tight_layout()
         return fig, axes
 
+
 class River:
-    def __init__(self, data, q_col=None, name=None, factor: float = 86400/1e9, scaling: float = 1):
+    def __init__(
+        self, data, q_col=None, name=None, factor: float = 86400 / 1e9, scaling: float = 1
+    ):
         """Wraps a river discharge time series for the lake model.
 
         Parameters
@@ -203,9 +202,9 @@ class River:
         freq = pd.infer_freq(self.Q_raw.index)
         if freq and freq.startswith("M"):
             # Monthly average m³/s → daily km³/day via interpolation
-            daily_index = pd.date_range(start=self.Q_raw.index.min(),
-                                        end=self.Q_raw.index.max(),
-                                        freq="D")
+            daily_index = pd.date_range(
+                start=self.Q_raw.index.min(), end=self.Q_raw.index.max(), freq="D"
+            )
             self.Q = self.Q_raw.reindex(daily_index).interpolate("time")  # m³/s daily
             self.Q = self.Q * factor * scaling  # convert to km³/day
         else:
@@ -218,7 +217,7 @@ class River:
             Q = Q.dropna()
         yearly = Q.resample("YE").sum(min_count=1 if skipna else None)
         plt.figure(figsize=(10, 4))
-        plt.bar(yearly.index.year, yearly.values, color='skyblue')
+        plt.bar(yearly.index.year, yearly.values, color="skyblue")
         plt.ylabel("Yearly Discharge (km³/yr)")
         plt.xlabel("Year")
         plt.title(f"{self.name} Yearly Discharge")
@@ -226,16 +225,15 @@ class River:
         plt.show()
 
     def plot_daily(self, skipna=True):
-        """Plot daily discharge as a line chart.
-        """
+        """Plot daily discharge as a line chart."""
         daily = self.Q.copy()
         if skipna:
             daily = daily.dropna()
         plt.figure(figsize=(12, 4))
-        plt.plot(daily.index, daily.values, color='dodgerblue')
-        plt.ylabel('Daily Discharge (km³/day)')
-        plt.xlabel('Date')
-        plt.title(f'{self.name} Daily Discharge')
+        plt.plot(daily.index, daily.values, color="dodgerblue")
+        plt.ylabel("Daily Discharge (km³/day)")
+        plt.xlabel("Date")
+        plt.title(f"{self.name} Daily Discharge")
         plt.grid(True)
         plt.show()
 
@@ -270,8 +268,7 @@ class River:
 
         # 3. Group by bins
         grouped = yearly_sum.groupby(
-            pd.cut(yearly_sum.index, bins=bins, labels=labels, right=True),
-            observed=False
+            pd.cut(yearly_sum.index, bins=bins, labels=labels, right=True), observed=False
         )
 
         # 4. Compute 5-year average
@@ -290,7 +287,9 @@ class River:
         return df
 
     @classmethod
-    def from_pickle(cls, pkl_path: Path, name: str = None, scaling: float = 1.0, q_col: str = "m3_s"):
+    def from_pickle(
+        cls, pkl_path: Path, name: str = None, scaling: float = 1.0, q_col: str = "m3_s"
+    ):
         """Load a River object from a pickle saved by save_HBV_results.
 
         Parameters
@@ -313,9 +312,8 @@ class River:
         return river
 
 
-
 class MultiRiver:
-    def __init__(self, rivers, q_col=None, factor: float = 86400/1e9, scaling: float = 1):
+    def __init__(self, rivers, q_col=None, factor: float = 86400 / 1e9, scaling: float = 1):
         """Wrapper for multiple rivers.
 
         Parameters
@@ -337,11 +335,11 @@ class MultiRiver:
     def plot_yearly(self):
         plt.figure(figsize=(12, 5))
         for name, river in self.rivers.items():
-            yearly = river.Q.resample('YE').sum()
-            plt.plot(yearly.index.year, yearly.values, marker='o', label=name)
-        plt.ylabel('Yearly Discharge (km³/yr)')
-        plt.xlabel('Year')
-        plt.title('Yearly Discharge - Multiple Rivers')
+            yearly = river.Q.resample("YE").sum()
+            plt.plot(yearly.index.year, yearly.values, marker="o", label=name)
+        plt.ylabel("Yearly Discharge (km³/yr)")
+        plt.xlabel("Year")
+        plt.title("Yearly Discharge - Multiple Rivers")
         plt.grid(True)
         plt.legend()
         plt.show()
@@ -351,16 +349,15 @@ class MultiRiver:
         for name, river in self.rivers.items():
             daily = river.Q.dropna()
             plt.plot(daily.index, daily.values, label=name)
-        plt.ylabel('Daily Discharge (km³/day)')
-        plt.xlabel('Date')
-        plt.title('Daily Discharge - Multiple Rivers')
+        plt.ylabel("Daily Discharge (km³/day)")
+        plt.xlabel("Date")
+        plt.title("Daily Discharge - Multiple Rivers")
         plt.grid(True)
         plt.legend()
         plt.show()
 
 
-
-#fluxes
+# fluxes
 def discharge_to_km3day(Q_m3s):
     """Converts discharge from m3s to km3day
 
@@ -393,6 +390,7 @@ def compute_total_river_inflow(i, rivers, connected=True):
     # e.g., return {'north': rivers[1].Q.iloc[i], 'south': rivers[0].Q.iloc[i]}
     return sum(r.Q.iloc[i] for r in rivers)
 
+
 def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     """Convert potential evaporation flux to km3/day.
 
@@ -418,6 +416,7 @@ def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     evap_km3_day = MAKKINK_FACTOR * evap_km3_day
     return evap_km3_day
 
+
 def compute_precip_km3day(precip_mm_day, area_km2):
     """Convert potential precip flux to km3/day. very rudimenteray right now
 
@@ -442,9 +441,8 @@ def compute_precip_km3day(precip_mm_day, area_km2):
     precip_km3_day = precip_mm_day / 1e6 * area_km2
 
     # makkink conversion factor open water evaporation
-    #evap_km3_day = MAKKINK_FACTOR * evap_km3_day
+    # evap_km3_day = MAKKINK_FACTOR * evap_km3_day
     return precip_km3_day
-
 
 
 ## Daily status update - Volume balance
@@ -456,29 +454,23 @@ def update_volume(
     scale_inflow=1.0,
     precip=0,
 ):
-    """Updates the volume for the volume balance model. rudimentary right now.
-    """
-    V_new = (
-        V_prev
-        + scale_inflow * Q_in
-        - Q_gw
-        - evap
-        + precip
-    )
+    """Updates the volume for the volume balance model. rudimentary right now."""
+    V_new = V_prev + scale_inflow * Q_in - Q_gw - evap + precip
     return max(V_new, 0.0)
+
 
 # --- main model ---
 def run_connected_aral_model(
-    aral_meteo: xr.Dataset,     # xarray Dataset with meteo forcing, must containg [evspsblpot]
-    rivers: list["River"],      # list of River objects, e.g., [River_Amu_Darya, River_Syr_Darya]
-    ahv_csv: str,              # path to A-H-V CSV file with columns: elevation_m, volume_km3, area_km2
-    V0_km3: float = 1100,       # initial lake volume [km3]
+    aral_meteo: xr.Dataset,  # xarray Dataset with meteo forcing, must containg [evspsblpot]
+    rivers: list["River"],  # list of River objects, e.g., [River_Amu_Darya, River_Syr_Darya]
+    ahv_csv: str,  # path to A-H-V CSV file with columns: elevation_m, volume_km3, area_km2
+    V0_km3: float = 1100,  # initial lake volume [km3]
     start_time=None,  # optional: datetime-like string or pd.Timestamp
-    end_time=None,     # optional: datetime-like string or pd.Timestamp
+    end_time=None,  # optional: datetime-like string or pd.Timestamp
     show_progress: bool = True,
     tqdm_position: int = 0,
     aral_precip: xr.Dataset = None,  # xarray Dataset with meteo forcing, must containg [evspsblpot]
-)-> pd.DataFrame:
+) -> pd.DataFrame:
     """Connected Aral Sea daily water balance model.
 
     Parameters
@@ -497,40 +489,40 @@ def run_connected_aral_model(
     pandas.DataFrame
         Columns: time, volume_km3, area_km2, elevation_m
     """
-        # --- Slice meteorological forcing ---
+    # --- Slice meteorological forcing ---
     if start_time is not None or end_time is not None:
-        aral_meteo = aral_meteo.sel(
-            time=slice(start_time, end_time)
-        )
+        aral_meteo = aral_meteo.sel(time=slice(start_time, end_time))
 
     # --- Slice river time series ---
     for r in rivers:
         if start_time is not None or end_time is not None:
-            mask = (r.Q_raw.index >= pd.to_datetime(start_time)) & \
-                   (r.Q_raw.index <= pd.to_datetime(end_time))
+            mask = (r.Q_raw.index >= pd.to_datetime(start_time)) & (
+                r.Q_raw.index <= pd.to_datetime(end_time)
+            )
             r.Q = r.Q_raw.loc[mask] * (r.Q / r.Q_raw).iloc[0]  # keeps factor/scaling applied
 
     n = min(len(aral_meteo.time), min(len(r.Q) for r in rivers))
-
 
     V = pd.Series(index=range(n), dtype=float)
     A = pd.Series(index=range(n), dtype=float)
     H = pd.Series(index=range(n), dtype=float)
     Q_in_series = pd.Series(index=range(n), dtype=float)
     evap_series = pd.Series(index=range(n), dtype=float)
-    precip_series = pd.Series(index=range(n),dtype = float)
+    precip_series = pd.Series(index=range(n), dtype=float)
 
     V.iloc[0] = V0_km3
     geom = LakeGeometry(ahv_csv)
 
     it = range(1, n)
     if show_progress:
-        it = tqdm(it, desc="Simulating Aral Sea volume balance", position=tqdm_position, leave=False)
+        it = tqdm(
+            it, desc="Simulating Aral Sea volume balance", position=tqdm_position, leave=False
+        )
 
     for i in it:
         # Geometry
-        A.iloc[i] = geom.area_from_volume(V.iloc[i-1])
-        H.iloc[i] = geom.elevation_from_volume(V.iloc[i-1])
+        A.iloc[i] = geom.area_from_volume(V.iloc[i - 1])
+        H.iloc[i] = geom.elevation_from_volume(V.iloc[i - 1])
 
         # Total river inflow
         Q_in = compute_total_river_inflow(i, rivers)
@@ -544,26 +536,25 @@ def run_connected_aral_model(
         evap_series.iloc[i] = evap
 
         # Precipitation
-        precip=0
+        precip = 0
         if aral_precip:
             precip = compute_precip_km3day(aral_precip["pr"].isel(time=i).values, A.iloc[i])
         precip_series.iloc[i] = precip
 
         # Update volume
-        V.iloc[i] = update_volume(V.iloc[i-1], Q_in, evap, precip= precip)
+        V.iloc[i] = update_volume(V.iloc[i - 1], Q_in, evap, precip=precip)
 
-
-
-
-    return pd.DataFrame({
-        "time": aral_meteo.time.values[:n],
-        "volume_km3": V,
-        "area_km2": A,
-        "elevation_m": H,
-        "Q_in_km3day": Q_in_series,
-        "evap_km3day": evap_series,
-        "precip_km3day": precip_series,
-    })
+    return pd.DataFrame(
+        {
+            "time": aral_meteo.time.values[:n],
+            "volume_km3": V,
+            "area_km2": A,
+            "elevation_m": H,
+            "Q_in_km3day": Q_in_series,
+            "evap_km3day": evap_series,
+            "precip_km3day": precip_series,
+        }
+    )
 
 
 def plot_aral_results(results, labels=None, observations=None):
@@ -595,7 +586,7 @@ def plot_aral_results(results, labels=None, observations=None):
 
     # Default labels
     if labels is None:
-        labels = [f'Simulation {i+1}' for i in range(n_results)]
+        labels = [f"Simulation {i+1}" for i in range(n_results)]
 
     # Create subplots
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
@@ -606,9 +597,9 @@ def plot_aral_results(results, labels=None, observations=None):
 
     # Plot each simulation
     for df, label, color in zip(results, labels, colors):
-        axs[0].plot(df['time'], df['volume_km3'], label=label, color=color)
-        axs[1].plot(df['time'], df['elevation_m'], label=label, color=color)
-        axs[2].plot(df['time'], df['area_km2'], label=label, color=color)
+        axs[0].plot(df["time"], df["volume_km3"], label=label, color=color)
+        axs[1].plot(df["time"], df["elevation_m"], label=label, color=color)
+        axs[2].plot(df["time"], df["area_km2"], label=label, color=color)
 
     # Plot observations if provided
     if observations is not None:
@@ -622,25 +613,28 @@ def plot_aral_results(results, labels=None, observations=None):
                 continue  # skip invalid
 
             # Only plot elevation for observations
-            axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='x', color='k', s=25, label=obs_label)
+            axs[1].scatter(
+                df_obs["time"], df_obs["elevation_m"], marker="x", color="k", s=25, label=obs_label
+            )
 
     # Set titles and labels
-    axs[0].set_ylabel('Volume (km³)')
-    axs[0].set_title('Aral Sea Volume')
-    axs[1].set_ylabel('Elevation (m)')
-    axs[1].set_title('Aral Sea Elevation')
-    axs[2].set_ylabel('Area (km²)')
-    axs[2].set_title('Aral Sea Area')
+    axs[0].set_ylabel("Volume (km³)")
+    axs[0].set_title("Aral Sea Volume")
+    axs[1].set_ylabel("Elevation (m)")
+    axs[1].set_title("Aral Sea Elevation")
+    axs[2].set_ylabel("Area (km²)")
+    axs[2].set_title("Aral Sea Area")
 
     for ax in axs:
-        ax.set_xlabel('Time')
+        ax.set_xlabel("Time")
         ax.grid(True)
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
         ax.legend()
 
     plt.tight_layout()
     plt.show()
+
 
 def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
     """Plot ensemble Aral Sea simulation results with optional observations.
@@ -679,9 +673,9 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
     # Plot each simulation
     for df, group in zip(sim_results, groups):
         color = group_colors[group]
-        axs[0].plot(df['time'], df['volume_km3'], color=color, linewidth=1, alpha=0.7)
-        axs[1].plot(df['time'], df['elevation_m'], color=color, linewidth=1, alpha=0.7)
-        axs[2].plot(df['time'], df['area_km2'], color=color, linewidth=1, alpha=0.7)
+        axs[0].plot(df["time"], df["volume_km3"], color=color, linewidth=1, alpha=0.7)
+        axs[1].plot(df["time"], df["elevation_m"], color=color, linewidth=1, alpha=0.7)
+        axs[2].plot(df["time"], df["area_km2"], color=color, linewidth=1, alpha=0.7)
 
     # Plot observations if provided (on elevation subplot only)
     if observations is not None:
@@ -696,9 +690,16 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
 
             # Only plot once per label
             if obs_label in plotted_labels:
-                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='.', color='k', s=25)
+                axs[1].scatter(df_obs["time"], df_obs["elevation_m"], marker=".", color="k", s=25)
             else:
-                axs[1].scatter(df_obs['time'], df_obs['elevation_m'], marker='.', color='k', s=25, label=obs_label)
+                axs[1].scatter(
+                    df_obs["time"],
+                    df_obs["elevation_m"],
+                    marker=".",
+                    color="k",
+                    s=25,
+                    label=obs_label,
+                )
                 plotted_labels.add(obs_label)
 
     # Set titles and labels
@@ -712,7 +713,7 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
     for ax in axs:
         ax.set_xlabel("Time")
         ax.grid(True)
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
 
     # Legends
     for ax in axs:
@@ -721,12 +722,13 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
             ax.plot([], [], color=color, label=group)
         ax.legend()
 
-    plt.setp(axs[0].get_xticklabels(), rotation=45, ha='right')
-    plt.setp(axs[1].get_xticklabels(), rotation=45, ha='right')
-    plt.setp(axs[2].get_xticklabels(), rotation=45, ha='right')
+    plt.setp(axs[0].get_xticklabels(), rotation=45, ha="right")
+    plt.setp(axs[1].get_xticklabels(), rotation=45, ha="right")
+    plt.setp(axs[2].get_xticklabels(), rotation=45, ha="right")
 
     plt.tight_layout()
     plt.show()
+
 
 def plot_aral_fluxes(df):
     """Plot yearly inflow, evaporation, and net flux for the Aral Sea simulation.
@@ -749,7 +751,9 @@ def plot_aral_fluxes(df):
     df_yearly = df.set_index("time").resample("YE").sum()
 
     # Net flux (inflow - evaporation)
-    df_yearly["net_flux"] = df_yearly["Q_in_km3day"] + df_yearly["precip_km3day"] - df_yearly["evap_km3day"]
+    df_yearly["net_flux"] = (
+        df_yearly["Q_in_km3day"] + df_yearly["precip_km3day"] - df_yearly["evap_km3day"]
+    )
 
     # Determine shared y-axis limit for inflow and evaporation
     y_max = 1.1 * max(df_yearly["Q_in_km3day"].max(), df_yearly["evap_km3day"].max())
@@ -760,7 +764,7 @@ def plot_aral_fluxes(df):
     fig, axs = plt.subplots(1, 3, figsize=(20, 5))
 
     # Yearly inflow
-    axs[0].bar(df_yearly.index.year, df_yearly["Q_in_km3day"], color='tab:blue')
+    axs[0].bar(df_yearly.index.year, df_yearly["Q_in_km3day"], color="tab:blue")
     axs[0].set_title("Yearly River Inflow")
     axs[0].set_xlabel("Year")
     axs[0].set_ylabel("Inflow (km³/yr)")
@@ -768,7 +772,7 @@ def plot_aral_fluxes(df):
     axs[0].grid(True)
 
     # Yearly evaporation
-    axs[1].bar(df_yearly.index.year, df_yearly["evap_km3day"], color='tab:red')
+    axs[1].bar(df_yearly.index.year, df_yearly["evap_km3day"], color="tab:red")
     axs[1].set_title("Yearly Evaporation")
     axs[1].set_xlabel("Year")
     axs[1].set_ylabel("Evaporation (km³/yr)")
@@ -776,7 +780,7 @@ def plot_aral_fluxes(df):
     axs[1].grid(True)
 
     # Yearly net flux
-    axs[2].bar(df_yearly.index.year, df_yearly["net_flux"], color='tab:green')
+    axs[2].bar(df_yearly.index.year, df_yearly["net_flux"], color="tab:green")
     axs[2].set_title("Yearly Net Flux (Inflow - Evaporation)")
     axs[2].set_xlabel("Year")
     axs[2].set_ylabel("Net Flux (km³/yr)")
@@ -785,6 +789,7 @@ def plot_aral_fluxes(df):
 
     plt.tight_layout()
     plt.show()
+
 
 def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
     """Save Aral Sea simulation results in CSV, pickle, and NetCDF formats.
@@ -827,7 +832,8 @@ def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
 
     return paths
 
-def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFrame:
+
+def load_grdc_monthly(grdc_id: int, q_col="Original", name="None") -> pd.DataFrame:
     """Load a GRDC monthly discharge file and return a clean DataFrame
     indexed by datetime with monthly frequency.
 
@@ -844,13 +850,13 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
         DataFrame with datetime index (month start) and discharge column
     """
     df = pd.read_csv(
-        GRDC/"Monthly"/ f"{grdc_id}_Q_Month.txt",
+        GRDC / "Monthly" / f"{grdc_id}_Q_Month.txt",
         sep=";",
         comment="#",
         usecols=["YYYY-MM-DD", f" {q_col}"],  # original file may have leading space
         parse_dates=["YYYY-MM-DD"],
         encoding="latin1",
-        na_values=-999.0
+        na_values=-999.0,
     )
 
     df.columns = df.columns.str.strip()
@@ -867,6 +873,7 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
 
     # Return River object
     return River(df, q_col=q_col, name=name)
+
 
 def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
     """Load River objects for a given station, both ERA5 and CMIP_HIST.
@@ -892,13 +899,15 @@ def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
     rivers_era5 = [River.from_pickle(pkl, scaling=scaling_era5) for pkl in pkl_files_era5]
 
     # CMIP_HIST
-    pkl_files_cmip = sorted(station_dir.glob(f"CMIP_HIST/{station_name}_CMIP_HIST_1940-2014_cmaes_*.pkl"))
+    pkl_files_cmip = sorted(
+        station_dir.glob(f"CMIP_HIST/{station_name}_CMIP_HIST_1940-2014_cmaes_*.pkl")
+    )
     rivers_cmip = [River.from_pickle(pkl, scaling=scaling_cmip) for pkl in pkl_files_cmip]
 
     return {"ERA5": rivers_era5, "CMIP_HIST": rivers_cmip}
 
 
-def make_obs(): #csv_file: Path, nc_folder: Path):
+def make_obs():  # csv_file: Path, nc_folder: Path):
     """Load historical CSV and DAHITI NetCDF water level observations
     and return a list of tuples (DataFrame, label).
 
@@ -915,23 +924,20 @@ def make_obs(): #csv_file: Path, nc_folder: Path):
     csv_file = BATHYMETRY / "Nachtnebel_table.csv"
     nc_folder = DAHITI
 
-
     # ---------- CSV (historical table) ----------
     if csv_file.exists():
-        df_csv = pd.read_csv(csv_file, sep=';', decimal=',')
+        df_csv = pd.read_csv(csv_file, sep=";", decimal=",")
 
-        if not {'Year', 'elevation'}.issubset(df_csv.columns):
+        if not {"Year", "elevation"}.issubset(df_csv.columns):
             raise ValueError(
                 f"CSV must contain columns 'Year' and 'elevation'. Found: {df_csv.columns}"
             )
 
-        df_csv = df_csv[['Year', 'elevation']].copy()
-        df_csv['time'] = pd.to_datetime(df_csv['Year'], format='%Y')
-        df_csv['elevation_m'] = df_csv['elevation'].astype(float)
+        df_csv = df_csv[["Year", "elevation"]].copy()
+        df_csv["time"] = pd.to_datetime(df_csv["Year"], format="%Y")
+        df_csv["elevation_m"] = df_csv["elevation"].astype(float)
 
-        obs_list.append(
-            (df_csv[['time', 'elevation_m']], 'Historical')
-        )
+        obs_list.append((df_csv[["time", "elevation_m"]], "Historical"))
     else:
         print(f"CSV file not found: {csv_file}")
 
@@ -941,10 +947,9 @@ def make_obs(): #csv_file: Path, nc_folder: Path):
 
     for nc_file in nc_files:
         ds = xr.open_dataset(nc_file)
-        df_nc = pd.DataFrame({
-            "time": pd.to_datetime(ds['datetime'].values),
-            "elevation_m": ds['water_level'].values
-        })
-        obs_list.append((df_nc, 'Historical'))
+        df_nc = pd.DataFrame(
+            {"time": pd.to_datetime(ds["datetime"].values), "elevation_m": ds["water_level"].values}
+        )
+        obs_list.append((df_nc, "Historical"))
 
     return obs_list

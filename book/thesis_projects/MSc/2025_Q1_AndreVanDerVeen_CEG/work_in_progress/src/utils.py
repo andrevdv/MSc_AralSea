@@ -6,6 +6,7 @@ within the eWaterCycle framework. Includes functions for:
 - INI file comparison
 - GRDC metadata table generation
 """
+
 import configparser
 import re
 from collections.abc import Sequence
@@ -22,8 +23,9 @@ import rasterio.mask
 from pyproj import Geod
 from shapely.geometry import shape
 
-from src.paths import INI_COMPARISON, SHAPEFILES
 from src.constants import KOPPEN_DESCRIPTION
+from src.paths import INI_COMPARISON, SHAPEFILES
+
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """Compute the area (in m²) of the first polygon in a shapefile.
@@ -53,6 +55,7 @@ def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     area, _ = geod.geometry_area_perimeter(poly)
 
     return abs(area)
+
 
 def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
     """Convert HBV model output from mm/day to m³/s using catchment area.
@@ -86,8 +89,6 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
 def _get_catchment_area(shape_name: str) -> float:
     """Cached helper to retrieve catchment area to avoid repeated computations."""
     return catchment_area_from_shapefile(shape_name)
-
-
 
 
 def get_integer_multiple_bounds(
@@ -141,7 +142,7 @@ def get_integer_multiple_bounds(
         extent = max_val - min_val
         remainder = extent % multiple
         if remainder != 0:
-            max_val += (multiple - remainder)
+            max_val += multiple - remainder
         return min_val, max_val
 
     lon_min_f, lon_max_f = expand_to_multiple(lon_min_i, lon_max_i, multiple)
@@ -149,12 +150,14 @@ def get_integer_multiple_bounds(
 
     return lon_min_f, lat_min_f, lon_max_f, lat_max_f
 
+
 def _load_ini(path):
     """Load ini file into a dictionary-like structure."""
     cp = configparser.ConfigParser(interpolation=None)
     cp.optionxform = str  # preserve case
     cp.read(path)
     return cp
+
 
 def _generate_comparison_filename(file1, file2):
     """Generate a filename for the comparison output based on the two INI files being compared."""
@@ -165,7 +168,8 @@ def _generate_comparison_filename(file1, file2):
     filename = f"{name1}_vs_{name2}_{timestamp}.txt"
     return INI_COMPARISON / filename
 
-def compare_inis(file1, file2): #, save_file=None):
+
+def compare_inis(file1, file2):  # , save_file=None):
     """Compare two PCR-GLOBWB2 INI files and report differences.
 
     Parameters
@@ -241,7 +245,7 @@ def compare_inis(file1, file2): #, save_file=None):
                 output.append(f"    B: {v2}")
 
     # Print to console
-    #print("\n".join(output))
+    # print("\n".join(output))
 
     INI_COMPARISON.mkdir(parents=True, exist_ok=True)
 
@@ -256,6 +260,7 @@ def compare_inis(file1, file2): #, save_file=None):
 # GRDC READER TO LATEX TABLE
 # =====================================================
 
+
 def _metadata_patterns() -> dict:
     """Return a dictionary of regex patterns to extract metadata from GRDC station files."""
     return {
@@ -268,6 +273,7 @@ def _metadata_patterns() -> dict:
         "Data lines": r"Data lines\s*:\s*(\d+)",
         "Data Set Content": r"Data Set Content\s*:\s*(.+)",
     }
+
 
 def _read_text_file(path: Path) -> str:
     """Read a text file with UTF-8 encoding; fallback to Latin-1 if UTF-8 fails."""
@@ -288,6 +294,7 @@ def _extract_metadata(content: str, patterns: dict) -> dict:
         metadata[key] = match.group(1).strip() if match else None
     return metadata
 
+
 def _determine_frequency(content: str | None) -> str:
     """Determine time series frequency from content string ('Daily', 'Monthly', or '-')"""
     if not content:
@@ -298,6 +305,7 @@ def _determine_frequency(content: str | None) -> str:
     if "MONTHLY" in content:
         return "Monthly"
     return "-"
+
 
 def _collect_metadata(folder: Path, patterns: dict) -> pd.DataFrame:
     """Collect metadata from all .txt files in a folder and return as a DataFrame."""
@@ -311,6 +319,7 @@ def _collect_metadata(folder: Path, patterns: dict) -> pd.DataFrame:
 
     return pd.DataFrame(records)
 
+
 def _convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Convert numeric columns (Catchment area, Data lines) to proper types and formatted strings."""
     df["Data lines"] = df["Data lines"].astype("Int64")
@@ -319,11 +328,10 @@ def _convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
         lambda x: int(float(x)) if pd.notna(x) else pd.NA
     )
 
-    df["Data lines"] = df["Data lines"].map(
-        lambda x: "-" if pd.isna(x) or x == 0 else f"{x:,}"
-    )
+    df["Data lines"] = df["Data lines"].map(lambda x: "-" if pd.isna(x) or x == 0 else f"{x:,}")
 
     return df
+
 
 def _round_coordinates(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
     """Round latitude and longitude to specified decimals and convert to string format."""
@@ -336,6 +344,7 @@ def _round_coordinates(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
         )
     return df
 
+
 def _copy_nonempty_timeseries(df: pd.DataFrame) -> pd.DataFrame:
     """Filter DataFrame to include only stations with non-empty time series."""
     numeric = pd.to_numeric(
@@ -343,6 +352,7 @@ def _copy_nonempty_timeseries(df: pd.DataFrame) -> pd.DataFrame:
         errors="coerce",
     )
     return df[numeric > 0].copy()
+
 
 def _select_and_rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Select relevant columns and rename them for GRDC metadata table."""
@@ -359,20 +369,18 @@ def _select_and_rename_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     return df[list(columns.keys())].rename(columns=columns)
 
+
 def _sanitize_latex(value):
     """Escape LaTeX special characters in a string (e.g., _, &, %)."""
     if isinstance(value, str):
-        return (
-            value.replace("_", r"\_")
-                 .replace("&", r"\&")
-                 .replace("%", r"\%")
-        )
+        return value.replace("_", r"\_").replace("&", r"\&").replace("%", r"\%")
     return value
 
 
 def _sanitize_dataframe_for_latex(df: pd.DataFrame) -> pd.DataFrame:
     """Apply LaTeX sanitization to all string entries in the DataFrame."""
     return df.map(_sanitize_latex)
+
 
 def _export_to_latex(
     df: pd.DataFrame,
@@ -392,6 +400,7 @@ def _export_to_latex(
     )
     output_path.write_text(latex, encoding="utf-8")
 
+
 def _simplify_daily_timeseries(ts):
     """Simplify daily time series string to 'start_year - end_year' format."""
     if pd.isna(ts):
@@ -401,6 +410,7 @@ def _simplify_daily_timeseries(ts):
         return f"{match[0]} - {match[-1]}"
     return ts
 
+
 def _split_by_frequency(df: pd.DataFrame):
     """Split metadata DataFrame into daily and monthly DataFrames and clean columns."""
     df_daily = df[df["Freq"] == "Daily"].copy()
@@ -408,9 +418,7 @@ def _split_by_frequency(df: pd.DataFrame):
 
     # Daily: simplify time series, remove Freq
     if not df_daily.empty:
-        df_daily["Time Series"] = df_daily["Time Series"].apply(
-            _simplify_daily_timeseries
-        )
+        df_daily["Time Series"] = df_daily["Time Series"].apply(_simplify_daily_timeseries)
         df_daily.drop(columns=["Freq"], inplace=True)
 
     # Monthly: just remove Freq
@@ -418,8 +426,6 @@ def _split_by_frequency(df: pd.DataFrame):
         df_monthly.drop(columns=["Freq"], inplace=True)
 
     return df_daily, df_monthly
-
-
 
 
 def _export_daily_monthly_tables(
@@ -438,9 +444,7 @@ def _export_daily_monthly_tables(
             escape=False,
             column_format="lp{4.3cm}llrlr",
         )
-        (export_dir / f"{base_filename}_monthly.tex").write_text(
-            latex_monthly, encoding="utf-8"
-        )
+        (export_dir / f"{base_filename}_monthly.tex").write_text(latex_monthly, encoding="utf-8")
 
     if not df_daily.empty:
         latex_daily = df_daily.to_latex(
@@ -451,10 +455,7 @@ def _export_daily_monthly_tables(
             escape=False,
             column_format="lp{4.3cm}llrlr",
         )
-        (export_dir / f"{base_filename}_daily.tex").write_text(
-            latex_daily, encoding="utf-8"
-        )
-
+        (export_dir / f"{base_filename}_daily.tex").write_text(latex_daily, encoding="utf-8")
 
 
 def build_grdc_metadata_table(
@@ -531,9 +532,36 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
     """
     path_to_file = Path(path_to_file)
     class_names = class_names or [
-        "Af","Am","Aw","BWh","BWk","BSh","BSk","Csa","Csb","Csc",
-        "Cwa","Cwb","Cwc","Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
-        "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd","ET","EF"
+        "Af",
+        "Am",
+        "Aw",
+        "BWh",
+        "BWk",
+        "BSh",
+        "BSk",
+        "Csa",
+        "Csb",
+        "Csc",
+        "Cwa",
+        "Cwb",
+        "Cwc",
+        "Cfa",
+        "Cfb",
+        "Cfc",
+        "Dsa",
+        "Dsb",
+        "Dsc",
+        "Dsd",
+        "Dwa",
+        "Dwb",
+        "Dwc",
+        "Dwd",
+        "Dfa",
+        "Dfb",
+        "Dfc",
+        "Dfd",
+        "ET",
+        "EF",
     ]
 
     with rasterio.open(path_to_file) as src:
@@ -545,7 +573,7 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
             lon_min, lat_min, lon_max, lat_max = extent
             # Convert lon/lat to row/col indices
             row_start, col_start = src.index(lon_min, lat_max)  # upper-left
-            row_stop, col_stop = src.index(lon_max, lat_min)    # lower-right
+            row_stop, col_stop = src.index(lon_max, lat_min)  # lower-right
 
             # Ensure indices are within raster bounds
             row_start = max(0, row_start)
@@ -560,7 +588,7 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
         flat_data = flat_data[flat_data != nodata]
 
     df_counts = pd.DataFrame(index=class_names)
-    df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+    df_counts["Plotted Area"] = [np.sum(flat_data == i + 1) for i in range(len(class_names))]
 
     # --- Shapefile counts ---
     if shapefiles:
@@ -575,22 +603,23 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
             if nodata is not None:
                 masked_flat = masked_flat[masked_flat != nodata]
 
-            df_counts[label] = [np.sum(masked_flat == i+1) for i in range(len(class_names))]
+            df_counts[label] = [np.sum(masked_flat == i + 1) for i in range(len(class_names))]
     # --- Percentages ---
     df_percent = df_counts.div(df_counts.sum(axis=0), axis=1) * 100
 
     return df_counts, df_percent
 
+
 def generate_koppen_tables(
-        df_percent,
-        koppen_description=None,
-        top_n=10,
-        save_tex=None,
-        save_md=None,
-        save_pkl=None,
-        caption=None,
-        label=None,
-    ):
+    df_percent,
+    koppen_description=None,
+    top_n=10,
+    save_tex=None,
+    save_md=None,
+    save_pkl=None,
+    caption=None,
+    label=None,
+):
     """Produce top-N class table with 'Other', optionally save as LaTeX / Markdown.
 
     Parameters
@@ -625,7 +654,7 @@ def generate_koppen_tables(
         top_df.insert(
             0,
             "Climate description",
-            [koppen_description.get(idx, "Other classes") for idx in top_df.index]
+            [koppen_description.get(idx, "Other classes") for idx in top_df.index],
         )
 
     # Save LaTeX
@@ -633,12 +662,11 @@ def generate_koppen_tables(
         latex_table = top_df.to_latex(
             float_format="%.1f",
             index=True,
-            caption=caption or
-                "Percentage coverage of dominant Köppen-Geiger climate classes",
+            caption=caption or "Percentage coverage of dominant Köppen-Geiger climate classes",
             label=label or "tab:koppen_geiger_percent",
-            column_format="ll" + "r"*len(top_df.columns[1:]),
+            column_format="ll" + "r" * len(top_df.columns[1:]),
             bold_rows=True,
-            escape=False
+            escape=False,
         )
         with open(save_tex, "w") as f:
             f.write(latex_table)
@@ -672,10 +700,14 @@ def generate_koppen_tables(
             # Fallback if tabulate is missing
             header = "| " + " | ".join(top_df.columns) + " |"
             # Right-align numeric columns using :---:
-            separator = "| " + " | ".join(
-                "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---"
-                for col in top_df.columns
-            ) + " |"
+            separator = (
+                "| "
+                + " | ".join(
+                    "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---"
+                    for col in top_df.columns
+                )
+                + " |"
+            )
             rows = ["| " + " | ".join(map(str, row)) + " |" for row in top_df.values]
             markdown_table = "\n".join([header, separator] + rows)
 
@@ -687,6 +719,7 @@ def generate_koppen_tables(
         df_percent.to_pickle(save_pkl)
 
     return top_df
+
 
 def get_combined_extent(shapefiles, padding=1.0):
     """Return combined lon/lat bounds of multiple shapefiles with optional padding.
@@ -723,8 +756,7 @@ def get_combined_extent(shapefiles, padding=1.0):
 
 
 def extract_scenario_and_year(path):
-    """Extract year range and scenario (if any) from raster path.
-    """
+    """Extract year range and scenario (if any) from raster path."""
     parts = Path(path).parts
     # Year folder is assumed to be immediately under KOPPEN_GEIGER
     try:
@@ -733,12 +765,8 @@ def extract_scenario_and_year(path):
         year_range = "unknown_year"
     # Scenario is next folder after year_range (if exists)
     year_index = parts.index(year_range)
-    scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
+    scenario = parts[year_index + 1] if (year_index + 1 < len(parts) - 1) else None
     return year_range, scenario
-
-
-
-
 
 
 def load_koppen_pickles_from_folder(pkl_folder):
@@ -809,6 +837,3 @@ def load_koppen_pickles_from_folder(pkl_folder):
     topdf_all["description"] = topdf_all["climate_class"].map(KOPPEN_DESCRIPTION)
 
     return topdf_all
-
-
-

@@ -61,30 +61,24 @@ def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir = (
-        FORCING_ERA5
-        / shape_name
-        / year_span
-
-    )
+    forcing_dir = FORCING_ERA5 / shape_name / year_span
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate forcing using eWaterCycle
     forcing = ewatercycle.forcing.sources["LumpedMakkinkForcing"].generate(
-        dataset="ERA5",
-        start_time=start,
-        end_time=end,
-        shape=shapefile,
-        directory=forcing_dir
+        dataset="ERA5", start_time=start, end_time=end, shape=shapefile, directory=forcing_dir
     )
 
     return forcing
 
-def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str=DEFAULT_CMIP6_MODELS['historical']):
+
+def generate_lumped_CMIP_historical_forcing(
+    shape_name: str, start: str, end: str, model: str = DEFAULT_CMIP6_MODELS["historical"]
+):
     """Generate CMIP6 historical forcing data for a lumped basin.
 
     Parameters
@@ -106,23 +100,19 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir =(
-        FORCING_CMIP_HIST
-        / shape_name
-        / year_span
-    )
+    forcing_dir = FORCING_CMIP_HIST / shape_name / year_span
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
-    cmip_historical =  {
-        'project': 'CMIP6',
-        'exp': 'historical',
-        'dataset': model,
-        "ensemble": 'r1i1p1f1',
-        'grid': 'gn'
+    cmip_historical = {
+        "project": "CMIP6",
+        "exp": "historical",
+        "dataset": model,
+        "ensemble": "r1i1p1f1",
+        "grid": "gn",
     }
 
     CMIP_forcing = ewatercycle.forcing.sources["LumpedMakkinkForcing"].generate(
@@ -135,7 +125,14 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
 
     return CMIP_forcing
 
-def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str="ssp245", model:str=DEFAULT_CMIP6_MODELS["future"]):
+
+def generate_lumped_CMIP_future_forcing(
+    shape_name: str,
+    start: str,
+    end: str,
+    ssp: str = "ssp245",
+    model: str = DEFAULT_CMIP6_MODELS["future"],
+):
     """Generate CMIP6 future scenario forcing data for a lumped basin.
 
     Parameters
@@ -159,29 +156,22 @@ def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir =(
-        FORCING_CMIP_FUT
-        / model
-        / ssp
-        / shape_name
-        / year_span
-    )
-
+    forcing_dir = FORCING_CMIP_FUT / model / ssp / shape_name / year_span
 
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
-    cmip_dataset =  {
-        'project': 'CMIP6',
-        'activity': 'ScenarioMIP',
-        'exp': ssp,
-        'mip': 'day',
-        'dataset': model,
-        'ensemble': 'r1i1p1f1',
-        'grid': '*'
+    cmip_dataset = {
+        "project": "CMIP6",
+        "activity": "ScenarioMIP",
+        "exp": ssp,
+        "mip": "day",
+        "dataset": model,
+        "ensemble": "r1i1p1f1",
+        "grid": "*",
     }
 
     CMIP_forcing = ewatercycle.forcing.sources["LumpedMakkinkForcing"].generate(
@@ -194,7 +184,10 @@ def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp
 
     return CMIP_forcing
 
-def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str, base_forcing_dir=None):
+
+def load_lumped_forcing_data(
+    shape_name: str, forcing_type: str, year_span: str, base_forcing_dir=None
+):
     """Load previously generated lumped forcing data for a given shapefile.
 
     Parameters
@@ -217,12 +210,21 @@ def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str,
         base_forcing_dir = FORCING_OUTPUT
 
     # Construct the load path
-    load_location = base_forcing_dir / f"{forcing_type}"/ f"{shape_name}" /year_span  / "work" / "diagnostic" / "script"
+    load_location = (
+        base_forcing_dir
+        / f"{forcing_type}"
+        / f"{shape_name}"
+        / year_span
+        / "work"
+        / "diagnostic"
+        / "script"
+    )
 
     # Load the forcing
     forcing = ewatercycle.forcing.sources["LumpedMakkinkForcing"].load(directory=load_location)
 
     return forcing
+
 
 def _ensure_dataset(obj):
     """Ensure the object is an xarray.Dataset.
@@ -254,10 +256,10 @@ def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
         Name of the catchment/shapefile, added to title if provided.
     """
     ERA5_data = {
-        'precipitation pr': _ensure_dataset(forcing_obj['pr']),
-        'temperature tas': _ensure_dataset(forcing_obj['tas']),
-        'incoming_shortwave_radiation rsds': _ensure_dataset(forcing_obj['rsds']),
-        'potential_evaporation evspsblpot': _ensure_dataset(forcing_obj['evspsblpot'])
+        "precipitation pr": _ensure_dataset(forcing_obj["pr"]),
+        "temperature tas": _ensure_dataset(forcing_obj["tas"]),
+        "incoming_shortwave_radiation rsds": _ensure_dataset(forcing_obj["rsds"]),
+        "potential_evaporation evspsblpot": _ensure_dataset(forcing_obj["evspsblpot"]),
     }
 
     plt.figure(figsize=(15, 10))
@@ -267,7 +269,7 @@ def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
         title_name = name.split(" ")[0]
         data[variable_name].plot()
         plt.title(f"{title_name}")
-        plt.grid(linestyle="--",alpha=0.5)
+        plt.grid(linestyle="--", alpha=0.5)
 
     if shape_name:
         plt.suptitle(f"ERA5 LumpedMakkink Forcing Data \n (shapefile = {shape_name})", fontsize=20)
@@ -277,7 +279,7 @@ def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
     plt.show()
 
 
-#NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
+# NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
 def create_forcing_slice(forcing_obj, start, end):
     """Temporarily slice ERA5 forcing data in memory.
     To use in HBV (and Leakybucket?)
@@ -296,7 +298,7 @@ def create_forcing_slice(forcing_obj, start, end):
     dict[str, xarray.Dataset]
         Sliced datasets (not written to disk)
     """
-    #NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
+    # NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
     sliced = {}
 
     for var in ["pr", "tas", "rsds", "evspsblpot"]:
@@ -304,6 +306,7 @@ def create_forcing_slice(forcing_obj, start, end):
         sliced[var] = ds.sel(time=slice(start, end))
 
     return sliced
+
 
 # ===========================================================================
 # FORCING GENERATION (PCR-GLOBWB)
@@ -316,6 +319,7 @@ def create_forcing_slice(forcing_obj, start, end):
 #     * CMIP historical
 #     * CMIP future (SSP scenarios)
 # ===========================================================================
+
 
 def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
     """Setup and generate forcing data for a given shapefile.
@@ -338,23 +342,18 @@ def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir = (
-        FORCING_PCRGLOB
-        / f"ERA5_{year_span}"
-        / shape_name
-
-    )
+    forcing_dir = FORCING_PCRGLOB / f"ERA5_{year_span}" / shape_name
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
     esmvaltool_padding = 2
 
     lon_min_f, lat_min_f, lon_max_f, lat_max_f = get_integer_multiple_bounds(
-    shapefile, #   <----- add shapefiles here
-    multiple=3, #makes sure resolution is always correct
+        shapefile,  #   <----- add shapefiles here
+        multiple=3,  # makes sure resolution is always correct
     )
 
     pcrglobwb_forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].generate(
@@ -365,16 +364,24 @@ def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
         end_time_climatology=end,
         shape=shapefile,
         extract_region={
-        "start_longitude": lon_min_f - esmvaltool_padding,
-        "end_longitude": lon_max_f + esmvaltool_padding,
-        "start_latitude": lat_min_f - esmvaltool_padding,
-        "end_latitude": lat_max_f + esmvaltool_padding,},
-        directory = forcing_dir
-        )
+            "start_longitude": lon_min_f - esmvaltool_padding,
+            "end_longitude": lon_max_f + esmvaltool_padding,
+            "start_latitude": lat_min_f - esmvaltool_padding,
+            "end_latitude": lat_max_f + esmvaltool_padding,
+        },
+        directory=forcing_dir,
+    )
 
     return pcrglobwb_forcing
 
-def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end: str, model:str= DEFAULT_CMIP6_MODELS['historical'] ,ensemble:str = "r1i1p1f1"):
+
+def generate_PCRGLOBWB_CMIP_historical_forcing(
+    shape_name: str,
+    start: str,
+    end: str,
+    model: str = DEFAULT_CMIP6_MODELS["historical"],
+    ensemble: str = "r1i1p1f1",
+):
     """Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
 
@@ -395,35 +402,27 @@ def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end:
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
-    cmip_historical =  {
-        'project': 'CMIP6',
-        'exp': 'historical',
-        'dataset': model,
+    cmip_historical = {
+        "project": "CMIP6",
+        "exp": "historical",
+        "dataset": model,
         "ensemble": ensemble,
-        'grid': 'gn'
+        "grid": "gn",
     }
 
-
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir = (
-        FORCING_PCRGLOB
-        / f"CMIP6_{model}_{year_span}"
-        / shape_name
-
-    )
+    forcing_dir = FORCING_PCRGLOB / f"CMIP6_{model}_{year_span}" / shape_name
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
     esmvaltool_padding = 2
 
     lon_min_f, lat_min_f, lon_max_f, lat_max_f = get_integer_multiple_bounds(
-    shapefile, #   <----- add shapefiles here
-    multiple=3, #makes sure resolution is always correct
+        shapefile,  #   <----- add shapefiles here
+        multiple=3,  # makes sure resolution is always correct
     )
-
-
 
     pcrglobwb_forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].generate(
         dataset=cmip_historical,
@@ -433,16 +432,25 @@ def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end:
         end_time_climatology=end,
         shape=shapefile,
         extract_region={
-        "start_longitude": lon_min_f - esmvaltool_padding,
-        "end_longitude": lon_max_f + esmvaltool_padding,
-        "start_latitude": lat_min_f - esmvaltool_padding,
-        "end_latitude": lat_max_f + esmvaltool_padding,},
-        directory = forcing_dir
-        )
+            "start_longitude": lon_min_f - esmvaltool_padding,
+            "end_longitude": lon_max_f + esmvaltool_padding,
+            "start_latitude": lat_min_f - esmvaltool_padding,
+            "end_latitude": lat_max_f + esmvaltool_padding,
+        },
+        directory=forcing_dir,
+    )
 
     return pcrglobwb_forcing
 
-def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = DEFAULT_CMIP6_MODELS["future"], ensemble:str = "r1i1p1f1"):
+
+def generate_PCRGLOBWB_CMIP_future_forcing(
+    shape_name: str,
+    start: str,
+    end: str,
+    ssp: str,
+    model: str = DEFAULT_CMIP6_MODELS["future"],
+    ensemble: str = "r1i1p1f1",
+):
     """Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
 
@@ -463,42 +471,29 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
 
+    cmip_dataset = {
+        "project": "CMIP6",
+        "activity": "ScenarioMIP",
+        "exp": ssp,
+        "mip": "day",
+        "dataset": model,
+        "ensemble": ensemble,
+        "grid": "*",
+    }
 
-
-    cmip_dataset =  {
-    'project': 'CMIP6',
-    'activity': 'ScenarioMIP',
-    'exp': ssp,
-    'mip': 'day',
-    'dataset': model,
-    'ensemble': ensemble,
-    'grid': '*'
-}
-
-
-    #year for naming
+    # year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
-    forcing_dir = (
-        FORCING_PCRGLOB
-        / "CMIP6"
-        / model
-        / ssp
-        / ensemble
-        / year_span
-        / shape_name
-    )
+    forcing_dir = FORCING_PCRGLOB / "CMIP6" / model / ssp / ensemble / year_span / shape_name
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
     esmvaltool_padding = 2
 
     lon_min_f, lat_min_f, lon_max_f, lat_max_f = get_integer_multiple_bounds(
-    shapefile, #   <----- add shapefiles here
-    multiple=3, #makes sure resolution is always correct
+        shapefile,  #   <----- add shapefiles here
+        multiple=3,  # makes sure resolution is always correct
     )
-
-
 
     pcrglobwb_forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].generate(
         dataset=cmip_dataset,
@@ -508,15 +503,15 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
         end_time_climatology=end,
         shape=shapefile,
         extract_region={
-        "start_longitude": lon_min_f - esmvaltool_padding,
-        "end_longitude": lon_max_f + esmvaltool_padding,
-        "start_latitude": lat_min_f - esmvaltool_padding,
-        "end_latitude": lat_max_f + esmvaltool_padding,},
-        directory = forcing_dir
-        )
+            "start_longitude": lon_min_f - esmvaltool_padding,
+            "end_longitude": lon_max_f + esmvaltool_padding,
+            "start_latitude": lat_min_f - esmvaltool_padding,
+            "end_latitude": lat_max_f + esmvaltool_padding,
+        },
+        directory=forcing_dir,
+    )
 
     return pcrglobwb_forcing
-
 
 
 # ===========================================================================
@@ -525,6 +520,7 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
 # - Applies to precipitation and temperature variables
 # - Overwrites original CMIP files
 # ===========================================================================
+
 
 def regrid_pcrglobwb_forcing(cmip_forcing, era5_forcing):
     """Regrid CMIP PCR-GLOBWB forcing to match ERA5 grid.
@@ -604,7 +600,7 @@ def _regrid_cmip_forcing_to_era5(
         ds_era5,
         method=method,
         extrap_method=extrap_method,
-        #reuse_weights=True,
+        # reuse_weights=True,
     )
 
     # Apply regridding
@@ -619,6 +615,7 @@ def _regrid_cmip_forcing_to_era5(
         ds_out.to_netcdf(cmip_path)
 
     return ds_out
+
 
 def detect_forcing_variable(ds):
     """Detect forcing variable type from dataset.
@@ -638,9 +635,7 @@ def detect_forcing_variable(ds):
     if varnames & temp_vars:
         return "temperature"
 
-    raise ValueError(
-        f"Could not detect forcing variable from variables: {varnames}"
-    )
+    raise ValueError(f"Could not detect forcing variable from variables: {varnames}")
 
 
 # ===========================================================================
@@ -649,10 +644,7 @@ def detect_forcing_variable(ds):
 # - Uses ERA5 as reference
 # ===========================================================================
 
-#Needs more testing.
-
-
-
+# Needs more testing.
 
 
 # ---------------------------

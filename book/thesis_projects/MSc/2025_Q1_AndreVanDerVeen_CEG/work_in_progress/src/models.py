@@ -22,7 +22,14 @@ from src.paths import INI_FILES, OUTPUT_HBV, PCR_GLOBAL_PARAMS
 from src.utils import mmday_to_m3s
 
 
-def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
+def simulate_HBV(
+    forcing,
+    parameter_set,
+    initial_conditions,
+    show_progress=True,
+    delete_files=False,
+    leave_pbar=True,
+):
     """Run the HBV model with a given forcing and parameters.
 
     Parameters
@@ -43,7 +50,9 @@ def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True,
     """
     # Initialize model
     model = ewatercycle.models.HBV(forcing=forcing)
-    config_file, config_dir = model.setup(parameters=parameter_set, initial_storage=initial_conditions)
+    config_file, config_dir = model.setup(
+        parameters=parameter_set, initial_storage=initial_conditions
+    )
     model.initialize(config_file)
 
     Q_m = []
@@ -53,7 +62,7 @@ def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True,
     total_steps = int((model.end_time - model.start_time) / model.time_step)
 
     if show_progress:
-        pbar = tqdm(total=total_steps, desc="Running HBV model",mininterval=1.0, leave=leave_pbar)
+        pbar = tqdm(total=total_steps, desc="Running HBV model", mininterval=1.0, leave=leave_pbar)
 
     while model.time < model.end_time:
         model.update()
@@ -80,10 +89,10 @@ def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True,
             print(f"Could not delete folder {config_dir}: {e}")
     model.finalize()
 
-
     # Return as pandas Series
     model_output = pd.Series(data=Q_m, name="Modelled_discharge", index=time)
     return model_output
+
 
 def plot_HBV_output(model_output: pd.Series):
     """Plot the HBV model output time series.
@@ -96,7 +105,7 @@ def plot_HBV_output(model_output: pd.Series):
     import matplotlib.pyplot as plt
 
     plt.figure(figsize=(12, 6))
-    plt.plot(model_output.index, model_output.values, label="Modelled Discharge", color='tab:blue')
+    plt.plot(model_output.index, model_output.values, label="Modelled Discharge", color="tab:blue")
     plt.xlabel("Time")
     plt.ylabel("Discharge (mm/d)")
     plt.title("HBV Modelled Discharge Time Series")
@@ -105,7 +114,13 @@ def plot_HBV_output(model_output: pd.Series):
     plt.show()
 
 
-def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str, run_tag: str = None,parameters: dict = None):
+def save_HBV_results(
+    model_output: pd.Series,
+    shape_name: str,
+    forcing_type: str,
+    run_tag: str = None,
+    parameters: dict = None,
+):
     """Save HBV model output as CSV, NetCDF, and pickle.
     Also converts results to m3/s using shapefile
 
@@ -125,14 +140,11 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
     start_year = model_output.index[0].year
     end_year = model_output.index[-1].year
 
-    #conversion to m3/s
-    model_output_m3 = mmday_to_m3s(model_output,shape_name )
+    # conversion to m3/s
+    model_output_m3 = mmday_to_m3s(model_output, shape_name)
 
-    #make df
-    df = pd.DataFrame({
-        "mm_day": model_output,
-        "m3_s": model_output_m3
-    })
+    # make df
+    df = pd.DataFrame({"mm_day": model_output, "m3_s": model_output_m3})
 
     # generate name
     base_filename = f"{shape_name}_{forcing_type}_{start_year}-{end_year}"
@@ -163,19 +175,24 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
         pickle.dump(payload, f)
 
     # Save as netcdf
-    ds = xr.Dataset({
-        "discharge_mm_day": ("time", model_output.values, {"units": "mm/day"}),
-        "discharge_m3_s": ("time", model_output_m3.values, {"units": "m3/s"})
-    }, coords={"time": model_output.index})
+    ds = xr.Dataset(
+        {
+            "discharge_mm_day": ("time", model_output.values, {"units": "mm/day"}),
+            "discharge_m3_s": ("time", model_output_m3.values, {"units": "m3/s"}),
+        },
+        coords={"time": model_output.index},
+    )
 
-    #metadata
-    ds.attrs.update({
-        "shape_name": shape_name,
-        "forcing_type": forcing_type,
-        "run_tag": run_tag,
-        "start_year": start_year,
-        "end_year": end_year,
-    })
+    # metadata
+    ds.attrs.update(
+        {
+            "shape_name": shape_name,
+            "forcing_type": forcing_type,
+            "run_tag": run_tag,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+    )
 
     if parameters is not None:
         for name, value in parameters.items():
@@ -186,7 +203,8 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
 
     return {"csv": csv_file, "pkl": pkl_file, "nc": nc_file}
 
-def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
+
+def simulate_PCRGLOBWB(forcing_path, ini_name, start_date, end_date):
     """Run the PCR-GLOBWB hydrological model for a given forcing and configuration.
 
     This function sets up and executes a PCR-GLOBWB simulation using the
@@ -223,9 +241,10 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
       must be read separately after the run.
     """
     from tqdm import tqdm as classic_tqdm
+
     # Convert ISO 8601 strings to datetime objects
-    start_time = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
-    end_time = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ')
+    start_time = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
+    end_time = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%SZ")
 
     # Calculate the number of days for the progression bar
     delta = end_time - start_time
@@ -233,48 +252,39 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
 
     pbar = classic_tqdm(total=number_of_days, desc="Initializing model", mininterval=1.0)
 
-
     # can be hardcoded, location of all the pcr-glob data on ewatercycle
     pcr_glob_directory = PCR_GLOBAL_PARAMS
 
-
     forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].load(
-    directory=forcing_path,
+        directory=forcing_path,
     )
 
     parameter_set = ewatercycle.parameter_sets.ParameterSet(
-    name="custom_parameter_set",
-    directory=pcr_glob_directory,
-    config= INI_FILES / ini_name,
-    target_model="pcrglobwb",
-    supported_model_versions={"setters"},
+        name="custom_parameter_set",
+        directory=pcr_glob_directory,
+        config=INI_FILES / ini_name,
+        target_model="pcrglobwb",
+        supported_model_versions={"setters"},
     )
 
-    model = ewatercycle.models.PCRGlobWB(
-    parameter_set=parameter_set,
-    forcing=forcing
-    )
+    model = ewatercycle.models.PCRGlobWB(parameter_set=parameter_set, forcing=forcing)
 
     model_config, model_dir = model.setup(
-    start_time = start_date,
-    end_time = end_date,
-    max_spinups_in_years=0
+        start_time=start_date, end_time=end_date, max_spinups_in_years=0
     )
 
     model.initialize(model_config)
 
     pbar.set_description("Running model")
     while model.time < model.end_time:
-
         model.update()
         pbar.update(1)
-
-
 
     pbar.close()
     tqdm.write("Model run finished!")
 
     model.finalize()
+
 
 def generate_HBV_parameters(n_particles: int):
     """Generate a set of HBV model parameter vectors.
@@ -294,15 +304,18 @@ def generate_HBV_parameters(n_particles: int):
     -----
     Parameters are randomly sampled within predefined ranges.
     """
-    p_min = np.array([0,   0.2,  40,    .5,   .001,   1,     .01,  .0001,   0.01]) #hardcoded for now TODO
-    p_max =np.array([25,    1,  800,   4,    .3,     15,    .02,   .01,      0.8]) #hardcoded for now TODO
+    p_min = np.array([0, 0.2, 40, 0.5, 0.001, 1, 0.01, 0.0001, 0.01])  # hardcoded for now TODO
+    p_max = np.array([25, 1, 800, 4, 0.3, 15, 0.02, 0.01, 0.8])  # hardcoded for now TODO
 
-    array_random_num = np.array([[np.random.random() for i in range(len(p_max))] for i in range(n_particles)])
-    generated_parameters = p_min + array_random_num * (p_max-p_min)
+    array_random_num = np.array(
+        [[np.random.random() for i in range(len(p_max))] for i in range(n_particles)]
+    )
+    generated_parameters = p_min + array_random_num * (p_max - p_min)
 
     return generated_parameters
 
-def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
+
+def simulate_HBV_ensemble(n_particles: int, forcing, delete_files=True):
     """Run multiple HBV simulations as an ensemble.
 
     Parameters
@@ -319,9 +332,9 @@ def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
     list of pd.Series
         Each element contains the simulated discharge time series for one particle.
     """
-    list_parameters = generate_HBV_parameters(n_particles) #store somewhere TODO
+    list_parameters = generate_HBV_parameters(n_particles)  # store somewhere TODO
 
-    s_0 = np.array([0,  100,  0,  5, 0]) #hardcoded storage TODO
+    s_0 = np.array([0, 100, 0, 5, 0])  # hardcoded storage TODO
 
     all_series = []
 
@@ -341,6 +354,7 @@ def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
 
     return df_all
 
+
 # ===========================================================================
 # better way of calibration?
 # using scipy optimize
@@ -349,29 +363,26 @@ def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
 
 parameter_names = [
     "Imax",  # 0
-    "Ce",    # 1
-    "Sumax", # 2
+    "Ce",  # 1
+    "Sumax",  # 2
     "Beta",  # 3
     "Pmax",  # 4
     "Tlag",  # 5
-    "Kf",    # 6
-    "Ks",    # 7
-    "FM"     # 8
+    "Kf",  # 6
+    "Ks",  # 7
+    "FM",  # 8
 ]
 
 
 # history tracking
-history = {
-    "theta_norm": [],
-    "theta_phys": [],
-    "objective": []
-}
+history = {"theta_norm": [], "theta_phys": [], "objective": []}
 
 
-p_min = HBV_PARAM_BOUNDS['min']
-p_max = HBV_PARAM_BOUNDS['max']
+p_min = HBV_PARAM_BOUNDS["min"]
+p_max = HBV_PARAM_BOUNDS["max"]
 # p_min = np.array([0, 0.2, 40, 0.5, 0.001, 1, 0.01, 0.0001, 0.01])
 # p_max = np.array([25, 1, 800, 4, 0.3, 15, 0.02, 0.01, 0.8])
+
 
 # scale parameters
 def scale(theta):
@@ -389,6 +400,7 @@ def scale(theta):
     """
     return (theta - p_min) / (p_max - p_min)
 
+
 def unscale(x):
     """Convert a normalized [0,1] HBV parameter vector back to physical units.
 
@@ -405,10 +417,10 @@ def unscale(x):
     return p_min + x * (p_max - p_min)
 
 
-
-
 bounds = list(zip(p_min, p_max))
-def run_hbv_single(theta, forcing,shape_name):
+
+
+def run_hbv_single(theta, forcing, shape_name):
     """Run a single HBV simulation with given parameter vector.
 
     Parameters
@@ -427,7 +439,7 @@ def run_hbv_single(theta, forcing,shape_name):
     """
     s_0 = np.array([0, 100, 0, 5, 0])  # later: make configurable
 
-    model_output   = run_HBV_model(
+    model_output = run_HBV_model(
         forcing=forcing,
         parameter_set=theta,
         initial_conditions=s_0,
@@ -471,10 +483,8 @@ def objective(theta_norm, forcing, q_obs, years, shape_name):
     theta = unscale(theta_norm)
     sim = run_hbv_single(theta, forcing, shape_name)
 
-
     # --- hydrograph fit ---
-    nse_val = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
-
+    nse_val = 1 - np.sum((sim - q_obs) ** 2) / np.sum((q_obs - q_obs.mean()) ** 2)
 
     # --- yearly volume error ---
     vol_errs = []
@@ -511,6 +521,7 @@ def volume_error(sim, obs):
 
 
 call_counter = {"n": 0}
+
 
 def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
     """Safe objective function for CMA-ES calibration of the HBV model.
@@ -550,12 +561,12 @@ def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
     sim = run_hbv_single(theta_phys, forcing, shape_name)
 
     # --- Metrics ---
-    nse = 1 - np.sum((sim - q_obs)**2) / np.sum((q_obs - q_obs.mean())**2)
+    nse = 1 - np.sum((sim - q_obs) ** 2) / np.sum((q_obs - q_obs.mean()) ** 2)
 
     r = np.corrcoef(sim, q_obs)[0, 1]
     alpha = np.std(sim) / np.std(q_obs)
     beta = np.mean(sim) / np.mean(q_obs)
-    kge = 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)
+    kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
 
     vol_err = volume_error(sim, q_obs)
 
@@ -571,6 +582,7 @@ def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
     history.setdefault("vol_err", []).append(vol_err)
 
     return obj_val
+
 
 def save_history(history, filename, folder="results", fmt="csv"):
     """Save CMA-ES calibration history to file.
@@ -604,17 +616,10 @@ def save_history(history, filename, folder="results", fmt="csv"):
 
     print(f"History saved to {path}")
 
-#TODO: add function for cma-es (note to self: see work document)
+
+# TODO: add function for cma-es (note to self: see work document)
 def run_cma_multiple_seeds(
-    objective_fn,
-    x0_norm,
-    sigma0,
-    args,
-    p_min,
-    p_max,
-    seeds=None,
-    popsize=15,
-    maxfevals=500
+    objective_fn, x0_norm, sigma0, args, p_min, p_max, seeds=None, popsize=15, maxfevals=500
 ):
     """Run multiple CMA-ES calibrations with different random seeds and collect histories.
 
@@ -658,23 +663,20 @@ def run_cma_multiple_seeds(
             sigma0,
             args=args,
             options={
-                'bounds': [np.zeros_like(p_min).tolist(), np.ones_like(p_max).tolist()],
-                'popsize': popsize,
-                'maxfevals': maxfevals,
-                'seed': s
-            }
+                "bounds": [np.zeros_like(p_min).tolist(), np.ones_like(p_max).tolist()],
+                "popsize": popsize,
+                "maxfevals": maxfevals,
+                "seed": s,
+            },
         )
 
         # convert history dict to DataFrame
         history_df = pd.DataFrame(history)
 
-        results_list.append({
-            'seed': s,
-            'res': res,
-            'history': history_df
-        })
+        results_list.append({"seed": s, "res": res, "history": history_df})
 
     return results_list
+
 
 def run_cma_single(
     cma_seed,
@@ -721,6 +723,7 @@ def run_cma_single(
     import pickle
 
     import cma
+
     local_history = {}
 
     # Wrap the objective to use this local history
@@ -735,7 +738,7 @@ def run_cma_single(
             "popsize": popsize,
             "maxfevals": maxfevals,
             "bounds": bounds,
-        }
+        },
     )
 
     es.optimize(objective_wrapped)
@@ -746,7 +749,7 @@ def run_cma_single(
         "best_x": es.best.x,
         "nfev": es.countevals,
         "sigma_final": es.sigma,
-        "history": local_history.copy()
+        "history": local_history.copy(),
     }
 
     # Save result if folder is provided
@@ -757,6 +760,7 @@ def run_cma_single(
         with open(file_path, "wb") as f:
             pickle.dump(result, f)
     return result
+
 
 def wrap_objective_safe(forcing, q_obs, shape_name):
     """Create a “safe” objective function for HBV CMA-ES calibration with a fixed forcing and catchment.
@@ -779,8 +783,10 @@ def wrap_objective_safe(forcing, q_obs, shape_name):
     callable
         Function of signature `objective(theta_norm, history)` compatible with CMA-ES.
     """
+
     def objective(theta_norm, history):
         return objective_safe(theta_norm, forcing, q_obs, shape_name, history)
+
     return objective
 
 
@@ -791,7 +797,7 @@ def run_hbv_for_best_params(
     params_path: Path,
     initial_conditions: dict,
     leave_pbar: bool = False,
-    delete_files: bool = True
+    delete_files: bool = True,
 ):
     """Load best parameter sets from a pickle file and run HBV simulations.
 
@@ -829,10 +835,11 @@ def run_hbv_for_best_params(
         parameter_sets=parameter_sets,
         initial_conditions=initial_conditions,
         leave_pbar=leave_pbar,
-        delete_files=delete_files
+        delete_files=delete_files,
     )
 
     return results
+
 
 def run_hbv_simulations(
     shapefile: str,
@@ -870,9 +877,7 @@ def run_hbv_simulations(
     """
     # Load forcing
     forcing = load_lumped_forcing_data(
-        shape_name=shapefile,
-        forcing_type=forcing_type,
-        year_span=year_span
+        shape_name=shapefile, forcing_type=forcing_type, year_span=year_span
     )
 
     all_results = []
@@ -893,19 +898,17 @@ def run_hbv_simulations(
             shape_name=shapefile,
             forcing_type=forcing_type,
             run_tag=f"cmaes_{i:03d}",
-            parameters=parameters
+            parameters=parameters,
         )
 
-        all_results.append({
-            "simulation": simulatie,
-            "parameters": parameters,
-        })
+        all_results.append(
+            {
+                "simulation": simulatie,
+                "parameters": parameters,
+            }
+        )
 
     return all_results
-
-
-
-
 
 
 # ---------------------------
@@ -920,28 +923,28 @@ objective_safe = objective_HBV_safe
 run_cma_ensemble = run_cma_multiple_seeds
 
 
-#--------------------------
+# --------------------------
 # Dummy parameters placeholder
 
-DUMMY_HBV_PARAMS =  [
+DUMMY_HBV_PARAMS = [
     7.085,  # Imax
     0.837,  # Ce
-    76.373, # Sumax
+    76.373,  # Sumax
     1.112,  # Beta
     0.245,  # Pmax
     7.801,  # Tlag
     0.096,  # Kf
     0.003,  # Ks
-    0.226   # FM
+    0.226,  # FM
 ]
 
 # Initial conditions placeholder
-DUMMY_HBV_INITIAL = np.array([
-    0,      # Si
-    100,    # Su
-    0,      # Sf
-    5,      # Ss
-    0       # Sp
-])
-
-
+DUMMY_HBV_INITIAL = np.array(
+    [
+        0,  # Si
+        100,  # Su
+        0,  # Sf
+        5,  # Ss
+        0,  # Sp
+    ]
+)

@@ -1,5 +1,5 @@
-"""Module defining paths used throughout the project.
-"""
+"""Module defining paths used throughout the project."""
+
 from pathlib import Path
 
 # ------------------------------
@@ -65,4 +65,6 @@ LOAD_PCR = Path("ERA5_1940-1960/AralSea_basin")
 # Specific Model Runs
 # ------------------------------
 
-PCR_TEST_ARAL = RUNS_PCR /"aral_sea_water_levels/pcrglobwb_20260210_112853/netcdf/discharge_dailyTot_output.nc"
+PCR_TEST_ARAL = (
+    RUNS_PCR / "aral_sea_water_levels/pcrglobwb_20260210_112853/netcdf/discharge_dailyTot_output.nc"
+)

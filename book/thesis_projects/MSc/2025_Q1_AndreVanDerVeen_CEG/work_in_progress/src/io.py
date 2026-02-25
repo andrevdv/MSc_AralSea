@@ -4,10 +4,7 @@ import requests
 
 
 def download_dahiti_water_level(
-    dahiti_ids,
-    api_key: str,
-    file_format: str = "netcdf",
-    download_folder: str = "downloads"
+    dahiti_ids, api_key: str, file_format: str = "netcdf", download_folder: str = "downloads"
 ):
     """Download water level data from DAHITI for one or multiple IDs.
 

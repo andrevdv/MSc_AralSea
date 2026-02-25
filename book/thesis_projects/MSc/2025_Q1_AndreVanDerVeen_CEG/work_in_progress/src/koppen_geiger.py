@@ -16,11 +16,10 @@ KOPPEN_DESCRIPTION : dict
     Mapping of class codes to full descriptions
 """
 
-
 # Path library
 import gc
 
-#from src.paths import SHAPEFILES
+# from src.paths import SHAPEFILES
 import re
 from pathlib import Path
 
@@ -46,21 +45,76 @@ from shapely.geometry import shape
 # Koppen-Geiger
 # ==============================================================================
 KOPPEN_CLASSES = [
-    "Af","Am","Aw","BWh","BWk","BSh","BSk",
-    "Csa","Csb","Csc","Cwa","Cwb","Cwc",
-    "Cfa","Cfb","Cfc","Dsa","Dsb","Dsc","Dsd",
-    "Dwa","Dwb","Dwc","Dwd","Dfa","Dfb","Dfc","Dfd",
-    "ET","EF"
+    "Af",
+    "Am",
+    "Aw",
+    "BWh",
+    "BWk",
+    "BSh",
+    "BSk",
+    "Csa",
+    "Csb",
+    "Csc",
+    "Cwa",
+    "Cwb",
+    "Cwc",
+    "Cfa",
+    "Cfb",
+    "Cfc",
+    "Dsa",
+    "Dsb",
+    "Dsc",
+    "Dsd",
+    "Dwa",
+    "Dwb",
+    "Dwc",
+    "Dwd",
+    "Dfa",
+    "Dfb",
+    "Dfc",
+    "Dfd",
+    "ET",
+    "EF",
 ]
 
-KOPPEN_RGB_COLORS = np.array([
-    [0, 0, 255], [0, 120, 255], [70, 170, 250], [255, 0, 0], [255, 150, 150],
-    [245, 165, 0], [255, 220, 100], [255, 255, 0], [200, 200, 0], [150, 150, 0],
-    [150, 255, 150], [100, 200, 100], [50, 150, 50], [200, 255, 80], [100, 255, 80],
-    [50, 200, 0], [255, 0, 255], [200, 0, 200], [150, 50, 150], [150, 100, 150],
-    [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
-    [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
-], dtype=float) / 255
+KOPPEN_RGB_COLORS = (
+    np.array(
+        [
+            [0, 0, 255],
+            [0, 120, 255],
+            [70, 170, 250],
+            [255, 0, 0],
+            [255, 150, 150],
+            [245, 165, 0],
+            [255, 220, 100],
+            [255, 255, 0],
+            [200, 200, 0],
+            [150, 150, 0],
+            [150, 255, 150],
+            [100, 200, 100],
+            [50, 150, 50],
+            [200, 255, 80],
+            [100, 255, 80],
+            [50, 200, 0],
+            [255, 0, 255],
+            [200, 0, 200],
+            [150, 50, 150],
+            [150, 100, 150],
+            [170, 175, 255],
+            [90, 120, 220],
+            [75, 80, 180],
+            [50, 0, 135],
+            [0, 255, 255],
+            [55, 200, 255],
+            [0, 125, 125],
+            [0, 70, 95],
+            [178, 178, 178],
+            [102, 102, 102],
+        ],
+        dtype=float,
+    )
+    / 255
+)
 
 KOPPEN_DESCRIPTION = {
     "Af": "Tropical rainforest",
@@ -92,14 +146,23 @@ KOPPEN_DESCRIPTION = {
     "Dfc": "Snow, no dry season, cold summer",
     "Dfd": "Snow, no dry season, very cold winter",
     "ET": "Tundra",
-    "EF": "Ice cap"
+    "EF": "Ice cap",
 }
 
 FALLBACK_EXTENT = (54, 33, 82, 53)
 
-def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None,
-                          plot_map=True, plot_hist=True, generate_table=True,
-                          save_dir=None, show_plot=False, return_fig=False):
+
+def analyse_koppen_geiger(
+    path_to_file,
+    shapefiles=None,
+    koppen_description=None,
+    plot_map=True,
+    plot_hist=True,
+    generate_table=True,
+    save_dir=None,
+    show_plot=False,
+    return_fig=False,
+):
     """High-level wrapper: compute counts, plot raster map, histograms, and generate tables.
 
     Returns:
@@ -112,7 +175,9 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     extent = get_combined_extent(shapefiles) if shapefiles else None
 
     # --- Compute counts ---
-    df_counts, df_percent = compute_koppen_class_counts(path_to_file, shapefiles=shapefiles, extent=extent)
+    df_counts, df_percent = compute_koppen_class_counts(
+        path_to_file, shapefiles=shapefiles, extent=extent
+    )
 
     fig, ax = (None, None)
     top_df = None
@@ -129,10 +194,7 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     if scenario:
         suffix += f"_{scenario}"
 
-    caption = (
-        "Percentage coverage of dominant Köppen-Geiger climate classes "
-        f"({year_range_str}"
-    )
+    caption = "Percentage coverage of dominant Köppen-Geiger climate classes " f"({year_range_str}"
     if scenario:
         caption += f", {scenario}"
     caption += ")"
@@ -145,13 +207,11 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     analysis_dir = Path(save_dir or ".") / suffix
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
-
-    analysis_dir  / f"koppen_map_{suffix}.png"
-    analysis_dir  / f"koppen_hist_{suffix}.png"
-    tex_file = analysis_dir  / f"koppen_table_{suffix}.tex"
-    md_file = analysis_dir  / f"koppen_table_{suffix}.md"
+    analysis_dir / f"koppen_map_{suffix}.png"
+    analysis_dir / f"koppen_hist_{suffix}.png"
+    tex_file = analysis_dir / f"koppen_table_{suffix}.tex"
+    md_file = analysis_dir / f"koppen_table_{suffix}.md"
     pkl_file = analysis_dir / f"koppen_table_{suffix}.pkl"
-
 
     # --- Map ---
     if plot_map:
@@ -169,7 +229,6 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             plt.close(fig)
             fig, ax = None, None  # Clear references
 
-
     # --- Histograms ---
     if plot_hist:
         plot_koppen_histograms(
@@ -178,12 +237,13 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             save_dir=analysis_dir,
             prefix=suffix,
             show_plot=show_plot,
-            title_prefix=f"Köppen-Geiger Class Distribution ({year_range_str}" + (f", {scenario}" if scenario else "") + ")",
+            title_prefix=f"Köppen-Geiger Class Distribution ({year_range_str}"
+            + (f", {scenario}" if scenario else "")
+            + ")",
         )
 
-        #prevent memory leak issues?
+        # prevent memory leak issues?
         gc.collect()
-
 
     # --- Table ---
     if generate_table:
@@ -195,7 +255,6 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             save_pkl=pkl_file,
             caption=caption,
             label=label,
-
         )
 
     # --- Return ---
@@ -207,11 +266,20 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     return df_percent, top_df
 
 
-
-def plot_koppen_geiger_map(path_to_file, shapefiles=None,
-                           show_plot=True, show_legend=True,
-                           show_title=True, savefig=False, save_dir=None,
-                           class_names=None, rgb_colors=None, extent=None, filename=None, title=None):
+def plot_koppen_geiger_map(
+    path_to_file,
+    shapefiles=None,
+    show_plot=True,
+    show_legend=True,
+    show_title=True,
+    savefig=False,
+    save_dir=None,
+    class_names=None,
+    rgb_colors=None,
+    extent=None,
+    filename=None,
+    title=None,
+):
     """Plot Köppen-Geiger raster map with optional shapefiles.
     Returns fig, ax.
     """
@@ -227,11 +295,13 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
 
     # --- Load raster ---
     import rasterio
-    with rasterio.open(path_to_file) as src:
-        window = src.window(lon_min, lat_min, lon_max, lat_max)   #don't need to load the whole thing
-        data = src.read(1, window=window)
-        #data = src.read(1)
 
+    with rasterio.open(path_to_file) as src:
+        window = src.window(
+            lon_min, lat_min, lon_max, lat_max
+        )  # don't need to load the whole thing
+        data = src.read(1, window=window)
+        # data = src.read(1)
 
     # --- Defaults ---
     class_names = class_names or KOPPEN_CLASSES
@@ -239,17 +309,21 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
         rgb_colors = KOPPEN_RGB_COLORS
 
     cmap = ListedColormap(np.array(rgb_colors))
-    norm = BoundaryNorm(np.arange(0.5, len(class_names)+0.5, 1), cmap.N)
+    norm = BoundaryNorm(np.arange(0.5, len(class_names) + 0.5, 1), cmap.N)
 
     # --- Figure ---
-    fig = plt.figure(figsize=(10,10), dpi=300)
+    fig = plt.figure(figsize=(10, 10), dpi=300)
     ax = plt.axes(projection=ccrs.PlateCarree())
     ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
-    ax.imshow(data, cmap=cmap, norm=norm, origin="upper",
-              extent=[lon_min, lon_max, lat_min, lat_max], transform=ccrs.PlateCarree())
-
-
+    ax.imshow(
+        data,
+        cmap=cmap,
+        norm=norm,
+        origin="upper",
+        extent=[lon_min, lon_max, lat_min, lat_max],
+        transform=ccrs.PlateCarree(),
+    )
 
     # --- Features ---
     ax.add_feature(COASTLINE)
@@ -259,8 +333,10 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
     ax.add_feature(OCEAN, facecolor="blue")
 
     # --- Shapefiles ---
-    legend_handles = [Patch(facecolor=rgb_colors[i], edgecolor="k", label=f"{i+1}: {name}")
-                  for i, name in enumerate(class_names)]
+    legend_handles = [
+        Patch(facecolor=rgb_colors[i], edgecolor="k", label=f"{i+1}: {name}")
+        for i, name in enumerate(class_names)
+    ]
 
     if shapefiles:
         for label, cfg in shapefiles.items():
@@ -275,23 +351,24 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
                 facecolor="none",
                 edgecolor=cfg.get("edgecolor", "black"),
                 linewidth=cfg.get("linewidth", 1),
-                linestyle=cfg.get("linestyle", "-")
+                linestyle=cfg.get("linestyle", "-"),
             )
             ax.add_feature(feature)
 
             # Add to legend
             legend_handles.append(
                 Line2D(
-                    [0], [0],
+                    [0],
+                    [0],
                     color=cfg.get("edgecolor", "black"),
                     linewidth=2,
                     label=label,
-                    linestyle=cfg.get("linestyle", "-")
+                    linestyle=cfg.get("linestyle", "-"),
                 )
             )
 
     if show_legend:
-        ax.legend(handles=legend_handles, bbox_to_anchor=(1.05,1), loc="upper left", fontsize=8)
+        ax.legend(handles=legend_handles, bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
 
     if show_title:
         if title is None:
@@ -313,10 +390,17 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
 
     return fig, ax
 
-def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
-                           show_plot=True, save_dir=None, prefix="", title_prefix=""):
-    """Plot percentage bar charts for map and shapefiles.
-    """
+
+def plot_koppen_histograms(
+    df_percent,
+    class_names=None,
+    shapefiles=None,
+    show_plot=True,
+    save_dir=None,
+    prefix="",
+    title_prefix="",
+):
+    """Plot percentage bar charts for map and shapefiles."""
     class_names = class_names or df_percent.index.tolist()
     rgb_colors = KOPPEN_RGB_COLORS
 
@@ -324,50 +408,65 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
         total = np.sum(counts)
         if total == 0:
             return np.zeros_like(counts, dtype=float)
-        return [c/total*100 for c in counts]
+        return [c / total * 100 for c in counts]
 
     # Map extent (first column)
     map_col = df_percent.columns[0]
-    fig = plt.figure(figsize=(12,4))
+    fig = plt.figure(figsize=(12, 4))
     try:
         plt.bar(class_names, counts_to_percent(df_percent[map_col]), color=rgb_colors)
         plt.xticks(rotation=90)
         plt.ylabel("Percentage (%)")
-        title_str = f"{title_prefix} ({map_col})" if title_prefix else f"Köppen-Geiger Class Distribution ({map_col})"
+        title_str = (
+            f"{title_prefix} ({map_col})"
+            if title_prefix
+            else f"Köppen-Geiger Class Distribution ({map_col})"
+        )
         plt.title(title_str)
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         if save_dir:
-            plt.savefig(Path(save_dir)/f"{map_col}_hist.png", dpi=300, bbox_inches="tight")
+            plt.savefig(Path(save_dir) / f"{map_col}_hist.png", dpi=300, bbox_inches="tight")
         if show_plot:
             plt.show()
-    finally: #fix memory leak issues
+    finally:  # fix memory leak issues
         plt.close(fig)
         del fig
 
     # Remaining columns (shapefiles)
     for col in df_percent.columns[1:]:
-        fig = plt.figure(figsize=(12,4))
+        fig = plt.figure(figsize=(12, 4))
         try:
             plt.bar(class_names, counts_to_percent(df_percent[col]), color=rgb_colors)
             plt.xticks(rotation=90)
             plt.ylabel("Percentage (%)")
-            title_str = f"{title_prefix} ({col})" if title_prefix else f"Köppen-Geiger Class Distribution ({col})"
+            title_str = (
+                f"{title_prefix} ({col})"
+                if title_prefix
+                else f"Köppen-Geiger Class Distribution ({col})"
+            )
             plt.title(title_str)
             plt.grid(axis="y", linestyle="--", alpha=0.5)
             if save_dir:
-                plt.savefig(Path(save_dir) / f"koppen_hist_{prefix}_{col}.png", dpi=300, bbox_inches="tight")
+                plt.savefig(
+                    Path(save_dir) / f"koppen_hist_{prefix}_{col}.png", dpi=300, bbox_inches="tight"
+                )
             if show_plot:
                 plt.show()
-        finally: #fix memory leak issues
+        finally:  # fix memory leak issues
             plt.close(fig)
             del fig
 
-        #memory leak issues
+        # memory leak issues
         gc.collect()
 
 
-
-def plot_climate_class_timeseries(topdf_all, climate_class, column_name="Plotted Area", hist_ref_period="1991_2020", plot_period="year_middle"):
+def plot_climate_class_timeseries(
+    topdf_all,
+    climate_class,
+    column_name="Plotted Area",
+    hist_ref_period="1991_2020",
+    plot_period="year_middle",
+):
     """Plot HIST and SSP lines for a given climate class over time.
 
     Parameters
@@ -421,7 +520,14 @@ def plot_climate_class_timeseries(topdf_all, climate_class, column_name="Plotted
 
     # HIST line
     hist_line = hist_df[hist_df["climate_class"] == climate_class].sort_values("year_start")
-    ax.plot(hist_line[plot_period], hist_line[column_name], color="black", marker="o", label="HIST", zorder=20)
+    ax.plot(
+        hist_line[plot_period],
+        hist_line[column_name],
+        color="black",
+        marker="o",
+        label="HIST",
+        zorder=20,
+    )
 
     # SSP lines
     for ssp, g in ssp_plot_df[ssp_plot_df["climate_class"] == climate_class].groupby("ssp"):
@@ -431,11 +537,10 @@ def plot_climate_class_timeseries(topdf_all, climate_class, column_name="Plotted
     ax.set_ylabel("Area (%)")
     ax.set_title(f"{climate_class} ({desc}) area fraction over time for {column_name}")
     ax.legend(title="Scenario")
-    ax.grid(linestyle='--', alpha=0.5)
+    ax.grid(linestyle="--", alpha=0.5)
     plt.tight_layout()
 
     return fig, ax
-
 
 
 def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None, extent=None):
@@ -462,7 +567,7 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
     class_names = class_names or KOPPEN_CLASSES
 
     df_counts = pd.DataFrame(index=class_names)
-    #df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+    # df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
 
     with rasterio.open(path_to_file) as src:
         nodata = src.nodata  # ALWAYS get nodata, it is the value the map uses as NoData (sea etc)
@@ -470,15 +575,15 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
     if extent:
         lon_min, lat_min, lon_max, lat_max = extent
 
-        with rasterio.open(path_to_file) as src:        #read only the extent
+        with rasterio.open(path_to_file) as src:  # read only the extent
             window = src.window(lon_min, lat_min, lon_max, lat_max)
             data = src.read(1, window=window)
 
-        flat_data = data.flatten()                      #remove the NoData
+        flat_data = data.flatten()  # remove the NoData
         if nodata is not None:
             flat_data = flat_data[flat_data != nodata]
 
-        df_counts["Plotted Area"] = [np.sum(flat_data == i+1) for i in range(len(class_names))]
+        df_counts["Plotted Area"] = [np.sum(flat_data == i + 1) for i in range(len(class_names))]
 
         # OPTIMIZATION: delete data
         del data, flat_data
@@ -487,33 +592,28 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
         # --- Shapefile counts ---
     if shapefiles:
         for label, cfg in shapefiles.items():
-            with fiona.open(cfg["path"]) as shp:                 #open the shapefiles
+            with fiona.open(cfg["path"]) as shp:  # open the shapefiles
                 geoms = [shape(feat["geometry"]) for feat in shp]  # list of Shapely geometries
 
-            with rasterio.open(path_to_file) as src:               #open the koppen-geiger map
-                masked, _ = rasterio.mask.mask(src, geoms, crop=True)   #keep only the pixels in the shapefile
+            with rasterio.open(path_to_file) as src:  # open the koppen-geiger map
+                masked, _ = rasterio.mask.mask(
+                    src, geoms, crop=True
+                )  # keep only the pixels in the shapefile
 
             masked_flat = masked[0].flatten()
             if nodata is not None:
-                masked_flat = masked_flat[masked_flat != nodata]  #removes NoData
+                masked_flat = masked_flat[masked_flat != nodata]  # removes NoData
 
-            df_counts[label] = [np.sum(masked_flat == i+1) for i in range(len(class_names))]  #count number of cells for each climate class
+            df_counts[label] = [
+                np.sum(masked_flat == i + 1) for i in range(len(class_names))
+            ]  # count number of cells for each climate class
 
-            del masked, masked_flat, geoms #fix memory leak issues
+            del masked, masked_flat, geoms  # fix memory leak issues
             gc.collect()
 
     df_percent = df_counts.div(df_counts.sum(axis=0), axis=1) * 100
 
     return df_counts, df_percent
-
-
-
-
-
-
-
-
-
 
     # with rasterio.open(path_to_file) as src:
     #     nodata = src.nodata  # ALWAYS get nodata, it is the value the map uses as NoData
@@ -562,16 +662,17 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
 
     # return df_counts, df_percent
 
+
 def generate_koppen_tables(
-        df_percent,
-        koppen_description=None,
-        top_n=10,
-        save_tex=None,
-        save_md=None,
-        save_pkl=None,
-        caption=None,
-        label=None,
-    ):
+    df_percent,
+    koppen_description=None,
+    top_n=10,
+    save_tex=None,
+    save_md=None,
+    save_pkl=None,
+    caption=None,
+    label=None,
+):
     """Produce top-N class table with 'Other', optionally save as LaTeX / Markdown.
 
     Parameters
@@ -606,7 +707,7 @@ def generate_koppen_tables(
         top_df.insert(
             0,
             "Climate description",
-            [koppen_description.get(idx, "Other classes") for idx in top_df.index]
+            [koppen_description.get(idx, "Other classes") for idx in top_df.index],
         )
 
     # Save LaTeX
@@ -614,12 +715,11 @@ def generate_koppen_tables(
         latex_table = top_df.to_latex(
             float_format="%.1f",
             index=True,
-            caption=caption or
-                "Percentage coverage of dominant Köppen-Geiger climate classes",
+            caption=caption or "Percentage coverage of dominant Köppen-Geiger climate classes",
             label=label or "tab:koppen_geiger_percent",
-            column_format="ll" + "r"*len(top_df.columns[1:]),
+            column_format="ll" + "r" * len(top_df.columns[1:]),
             bold_rows=True,
-            escape=False
+            escape=False,
         )
         with open(save_tex, "w") as f:
             f.write(latex_table)
@@ -653,10 +753,14 @@ def generate_koppen_tables(
             # Fallback if tabulate is missing
             header = "| " + " | ".join(top_df.columns) + " |"
             # Right-align numeric columns using :---:
-            separator = "| " + " | ".join(
-                "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---"
-                for col in top_df.columns
-            ) + " |"
+            separator = (
+                "| "
+                + " | ".join(
+                    "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---"
+                    for col in top_df.columns
+                )
+                + " |"
+            )
             rows = ["| " + " | ".join(map(str, row)) + " |" for row in top_df.values]
             markdown_table = "\n".join([header, separator] + rows)
 
@@ -668,6 +772,7 @@ def generate_koppen_tables(
         df_percent.to_pickle(save_pkl)
 
     return top_df
+
 
 def get_combined_extent(shapefiles, padding=1.0):
     """Return combined lon/lat bounds of multiple shapefiles with optional padding.
@@ -704,8 +809,7 @@ def get_combined_extent(shapefiles, padding=1.0):
 
 
 def extract_scenario_and_year(path):
-    """Extract year range and scenario (if any) from raster path.
-    """
+    """Extract year range and scenario (if any) from raster path."""
     parts = Path(path).parts
     # Year folder is assumed to be immediately under KOPPEN_GEIGER
     try:
@@ -714,7 +818,7 @@ def extract_scenario_and_year(path):
         year_range = "unknown_year"
     # Scenario is next folder after year_range (if exists)
     year_index = parts.index(year_range)
-    scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
+    scenario = parts[year_index + 1] if (year_index + 1 < len(parts) - 1) else None
     return year_range, scenario
 
 
@@ -778,7 +882,6 @@ def load_koppen_pickles_from_folder(pkl_folder):
 
     def period_to_year_end(p):
         return int(p.split("_")[1])
-
 
     topdf_all["year_start"] = topdf_all["period"].apply(period_to_year_start)
     topdf_all["year_middle"] = topdf_all["period"].apply(period_to_year_middle)
