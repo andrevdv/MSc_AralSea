@@ -137,7 +137,7 @@ def plot_precipitation_map(
     savepath=None,
 ):
     """Plot a filled contour map of precipitation with optional stations and contour lines.
-    
+
     Parameters
     ----------
     da : xarray.DataArray
@@ -678,8 +678,8 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
 
-    map_file = analysis_dir  / f"koppen_map_{suffix}.png"
-    hist_file = analysis_dir  / f"koppen_hist_{suffix}.png"
+    analysis_dir  / f"koppen_map_{suffix}.png"
+    analysis_dir  / f"koppen_hist_{suffix}.png"
     tex_file = analysis_dir  / f"koppen_table_{suffix}.tex"
     md_file = analysis_dir  / f"koppen_table_{suffix}.md"
     pkl_file = analysis_dir / f"koppen_table_{suffix}.pkl"
