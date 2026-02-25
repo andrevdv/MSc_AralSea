@@ -363,7 +363,7 @@ class MultiRiver:
 #fluxes
 def discharge_to_km3day(Q_m3s):
     """Converts discharge from m3s to km3day
-    
+
     :param Q_m3s: Description
     """
     return Q_m3s * 86400 / 1e9
@@ -870,7 +870,7 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
 
 def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
     """Load River objects for a given station, both ERA5 and CMIP_HIST.
-    
+
     Parameters
     ----------
     station_name : str
@@ -879,7 +879,7 @@ def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
         Scaling factor for ERA5 pickles.
     scaling_cmip : float
         Scaling factor for CMIP_HIST pickles.
-        
+
     Returns:
     -------
     dict

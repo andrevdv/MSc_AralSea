@@ -146,8 +146,8 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
 
-    map_file = analysis_dir  / f"koppen_map_{suffix}.png"
-    hist_file = analysis_dir  / f"koppen_hist_{suffix}.png"
+    analysis_dir  / f"koppen_map_{suffix}.png"
+    analysis_dir  / f"koppen_hist_{suffix}.png"
     tex_file = analysis_dir  / f"koppen_table_{suffix}.tex"
     md_file = analysis_dir  / f"koppen_table_{suffix}.md"
     pkl_file = analysis_dir / f"koppen_table_{suffix}.pkl"
@@ -671,14 +671,14 @@ def generate_koppen_tables(
 
 def get_combined_extent(shapefiles, padding=1.0):
     """Return combined lon/lat bounds of multiple shapefiles with optional padding.
-    
+
     Parameters
     ----------
     shapefiles : dict
         {"label": {"path": Path, ...}, ...}
     padding : float
         Degrees to extend bounds
-    
+
     Returns:
     -------
     lon_min, lat_min, lon_max, lat_max : float

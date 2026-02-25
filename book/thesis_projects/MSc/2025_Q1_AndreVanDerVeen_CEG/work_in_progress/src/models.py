@@ -189,9 +189,9 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
 def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
     """Run the PCR-GLOBWB hydrological model for a given forcing and configuration.
 
-    This function sets up and executes a PCR-GLOBWB simulation using the 
-    specified forcing data and parameter INI file. Currently, it relies on 
-    the eWaterCycle framework and a hardcoded location for global PCR-GLOBWB 
+    This function sets up and executes a PCR-GLOBWB simulation using the
+    specified forcing data and parameter INI file. Currently, it relies on
+    the eWaterCycle framework and a hardcoded location for global PCR-GLOBWB
     parameter sets. Progress is displayed with a tqdm bar.
 
     Parameters
@@ -612,7 +612,7 @@ def run_cma_multiple_seeds(
     args,
     p_min,
     p_max,
-    seeds=[0, 1, 2],
+    seeds=None,
     popsize=15,
     maxfevals=500
 ):
@@ -642,6 +642,8 @@ def run_cma_multiple_seeds(
     results_list : list of dict
         Each element is a dict with keys 'res' (CMA-ES output) and 'history' (DataFrame of metrics).
     """
+    if seeds is None:
+        seeds = [0, 1, 2]
     results_list = []
 
     for s in seeds:
@@ -759,8 +761,8 @@ def run_cma_single(
 def wrap_objective_safe(forcing, q_obs, shape_name):
     """Create a “safe” objective function for HBV CMA-ES calibration with a fixed forcing and catchment.
 
-    This returns a closure that wraps `objective_safe` with the provided forcing, 
-    observed streamflow, and catchment name, so it only requires `theta_norm` 
+    This returns a closure that wraps `objective_safe` with the provided forcing,
+    observed streamflow, and catchment name, so it only requires `theta_norm`
     and `history` during optimization.
 
     Parameters

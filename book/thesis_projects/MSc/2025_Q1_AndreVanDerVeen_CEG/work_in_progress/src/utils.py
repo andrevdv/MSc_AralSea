@@ -100,7 +100,7 @@ def get_integer_multiple_bounds(
     ----------
     shapefiles : str, Path, or list of str/Path
         Path(s) to the shapefile(s).
-    multiple : int, optional    
+    multiple : int, optional
         The multiple to which the bounds should be expanded (default is 3).
 
     Returns:
@@ -725,14 +725,14 @@ def generate_koppen_tables(
 
 def get_combined_extent(shapefiles, padding=1.0):
     """Return combined lon/lat bounds of multiple shapefiles with optional padding.
-    
+
     Parameters
     ----------
     shapefiles : dict
         {"label": {"path": Path, ...}, ...}
     padding : float
         Degrees to extend bounds
-    
+
     Returns:
     -------
     lon_min, lat_min, lon_max, lat_max : float
