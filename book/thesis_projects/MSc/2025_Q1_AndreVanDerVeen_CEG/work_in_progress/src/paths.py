@@ -1,6 +1,9 @@
 """Module defining paths used throughout the project."""
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ------------------------------
 # Project Root
@@ -28,7 +31,13 @@ FORCING_CMIP_HIST = FORCING_OUTPUT / "CMIP_HIST"
 FORCING_CMIP_FUT = FORCING_OUTPUT / "CMIP_FUT"
 FORCING_PCRGLOB = FORCING_OUTPUT / "PCRGLOBWB"
 
+
 PCR_GLOBAL_PARAMS = Path("/data/shared/parameter-sets/pcrglobwb_global")
+if not PCR_GLOBAL_PARAMS.exists():
+    logger.warning(
+        f"PCR_GLOBAL_PARAMS not found at {PCR_GLOBAL_PARAMS}. "
+        "This code requires eWaterCycle server access."
+    )
 # ------------------------------
 # Outputs
 # ------------------------------

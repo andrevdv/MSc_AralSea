@@ -921,30 +921,3 @@ run_cma = run_cma_single
 make_objective_safe = wrap_objective_safe
 objective_safe = objective_HBV_safe
 run_cma_ensemble = run_cma_multiple_seeds
-
-
-# --------------------------
-# Dummy parameters placeholder
-
-DUMMY_HBV_PARAMS = [
-    7.085,  # Imax
-    0.837,  # Ce
-    76.373,  # Sumax
-    1.112,  # Beta
-    0.245,  # Pmax
-    7.801,  # Tlag
-    0.096,  # Kf
-    0.003,  # Ks
-    0.226,  # FM
-]
-
-# Initial conditions placeholder
-DUMMY_HBV_INITIAL = np.array(
-    [
-        0,  # Si
-        100,  # Su
-        0,  # Sf
-        5,  # Ss
-        0,  # Sp
-    ]
-)
