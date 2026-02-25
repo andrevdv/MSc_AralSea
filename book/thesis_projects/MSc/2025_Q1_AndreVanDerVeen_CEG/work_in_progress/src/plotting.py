@@ -1,33 +1,37 @@
-"""
-module for plotting functions related to geospatial data and hydrological modeling. Used in thesis project. Might be extended later.
+"""module for plotting functions related to geospatial data and hydrological modeling. Used in thesis project. Might be extended later.
 """
 # Standard library
 from pathlib import Path
 
-# Numerical / plotting
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, BoundaryNorm
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-import matplotlib.patheffects as pe
-
-# Geospatial
-import fiona
-from shapely.geometry import shape
-import rasterio
-
 # Cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from cartopy.feature import ShapelyFeature, BORDERS, LAKES, RIVERS, COASTLINE, OCEAN
-from cartopy.io.shapereader import Reader
 
+# Geospatial
+import fiona
+import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+
+# Numerical / plotting
+import numpy as np
 import pandas as pd
+import rasterio
+from cartopy.feature import BORDERS, COASTLINE, LAKES, OCEAN, RIVERS, ShapelyFeature
+from cartopy.io.shapereader import Reader
+from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from shapely.geometry import shape
 
 # Local modules
 from src.paths import SHAPEFILES
-from src.utils import compute_koppen_class_counts, generate_koppen_tables, get_integer_multiple_bounds, get_combined_extent, KOPPEN_DESCRIPTION,extract_scenario_and_year
+from src.utils import (
+    compute_koppen_class_counts,
+    extract_scenario_and_year,
+    generate_koppen_tables,
+    get_combined_extent,
+    get_integer_multiple_bounds,
+)
 
 
 def plot_shapefile_overview(
@@ -37,8 +41,7 @@ def plot_shapefile_overview(
     figsize=(10, 8),
     ax=None,
 ):
-    """
-    Plot a simple overview map of a shapefile (context / locator map).
+    """Plot a simple overview map of a shapefile (context / locator map).
     automatically extents to integer bounds as used in PCR-GLOBWB2 modelling
 
     Parameters
@@ -54,11 +57,10 @@ def plot_shapefile_overview(
     ax : cartopy.mpl.geoaxes.GeoAxes, optional
         Existing axes to plot on
 
-    Returns
+    Returns:
     -------
     fig, ax
     """
-
     # Create figure/axes if needed
     if ax is None:
         fig = plt.figure(figsize=figsize)
@@ -96,7 +98,7 @@ def plot_shapefile_overview(
         shapefile,
         multiple=3,
     )
-    
+
     ax.set_extent(
         [
             lon_min - padding,
@@ -134,8 +136,7 @@ def plot_precipitation_map(
     cmap="YlGnBu",
     savepath=None,
 ):
-    """
-    Plot a filled contour map of precipitation with optional stations and contour lines.
+    """Plot a filled contour map of precipitation with optional stations and contour lines.
     
     Parameters
     ----------
@@ -160,12 +161,11 @@ def plot_precipitation_map(
     savepath : str or Path
         Path to save figure (optional)
     """
-    
     levels = np.linspace(vmin, vmax, n_levels)
-    
+
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi,
                            subplot_kw={'projection': ccrs.PlateCarree()})
-    
+
     # Filled contours
     im = ax.contourf(
         da['lon'], da['lat'], da,
@@ -173,7 +173,7 @@ def plot_precipitation_map(
         cmap=cmap,
         extend='both'
     )
-    
+
     # Contour lines
     cs = ax.contour(
         da['lon'], da['lat'], da,
@@ -182,7 +182,7 @@ def plot_precipitation_map(
         linewidths=0.2,
         linestyles='--'
     )
-    
+
     # Add contour labels
     if contour_lines is not None:
         ax.clabel(
@@ -192,7 +192,7 @@ def plot_precipitation_map(
             fmt="%.0f",
             fontsize=6
         )
-    
+
     # Plot stations
     if stations is not None:
         for s in stations:
@@ -201,7 +201,7 @@ def plot_precipitation_map(
                             transform=ccrs.PlateCarree(),
                             markeredgecolor='white', markeredgewidth=1)
             ax.add_line(marker)
-            
+
             ax.text(
                 s['lon']+0.3, s['lat'], s['name'],
                 transform=ccrs.PlateCarree(),
@@ -209,35 +209,35 @@ def plot_precipitation_map(
                 color='tab:red',
                 path_effects=[pe.withStroke(linewidth=1, foreground="white")]
             )
-    
+
     # Map features
     ax.add_feature(cfeature.COASTLINE)
     ax.add_feature(cfeature.LAKES, alpha=0.5)
     ax.add_feature(cfeature.OCEAN,facecolor="#a2daff", edgecolor="none", zorder=2)
     ax.add_feature(cfeature.RIVERS)
-    
+
     ax.set_title(title)
-    
+
     # Colorbar
     cbar = fig.colorbar(im, ax=ax, orientation="vertical",
                         shrink=0.7,
                         aspect=25,
                         pad=0.02)
     cbar.set_label("mm/year")
-    
+
     # Gridlines
     gl = ax.gridlines(draw_labels=True, linestyle="--", linewidth=0.5)
     gl.top_labels = False
     gl.right_labels = False
-    
+
     fig.tight_layout(pad=0.1)
-    
+
     # Save figure if path provided
     if savepath is not None:
         plt.savefig(savepath, bbox_inches='tight', pad_inches=0.05, dpi=dpi)
-    
+
     plt.show()
-    
+
     return fig, ax
 
 def plot_dem_map(
@@ -248,8 +248,7 @@ def plot_dem_map(
     savepath=None,
     shapefile=None,
 ):
-    """
-    Plot a DEM (digital elevation) DataArray using Cartopy.
+    """Plot a DEM (digital elevation) DataArray using Cartopy.
 
     Parameters
     ----------
@@ -265,13 +264,13 @@ def plot_dem_map(
         Optional path to save the figure
     """
     fig, ax = plt.subplots(figsize=figsize, subplot_kw={'projection': ccrs.PlateCarree()})
-    
+
     im = ax.pcolormesh(
         da['lon'], da['lat'], da,
         cmap=cmap,
         shading='auto',
     )
-    
+
     # Map features
     ax.add_feature(cfeature.COASTLINE)
     ax.add_feature(cfeature.LAKES)
@@ -291,27 +290,26 @@ def plot_dem_map(
                     # alpha=outline_alpha,
                     # linewidth=outline_linewidth
                 )
-    
-    
+
+
     if title is None:
         title = "DEM map"
     ax.set_title(title)
-    
+
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', shrink=0.7)
     cbar.set_label("Elevation (m)")
-    
+
     if savepath is not None:
         plt.savefig(savepath, bbox_inches='tight', dpi=200)
-    
+
     plt.show()
-    
+
     return fig, ax
 
 
 ## make koppen-geiger figure
 def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=True, show_plot=True, show_title=True):
-    """
-    Plot Köppen-Geiger climate zones from a raster file.
+    """Plot Köppen-Geiger climate zones from a raster file.
 
     Parameters
     ----------
@@ -328,12 +326,12 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
     show_title : bool, default True
         Display the default title on the plot.
 
-    Returns
+    Returns:
     -------
     None
         Figure is displayed or saved to disk depending on parameters.
 
-    Notes
+    Notes:
     -----
     If both savefig=False and show_plot=False, no figure is output.
     """
@@ -368,7 +366,7 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
         "Aral Sea Basin": {"path": SHAPEFILES/"AralSea_basin/AralSea_basin.shp", "edgecolor": "black", "linewidth": 1, "linestyle":"-"}
     }
 
-    
+
     # --- Cartopy figure ---
     fig = plt.figure(figsize=(10,10), dpi = 300)
     ax = plt.axes(projection=ccrs.PlateCarree())
@@ -433,7 +431,7 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
     else:  # historical
         year_range = parts[-2]
         title_str = f"Köppen-Geiger Map ({year_range})"
-    
+
     if show_title:
         plt.title(title_str, fontsize=14)
 
@@ -460,21 +458,19 @@ def plot_koppen_geiger(path_to_file, savefig=False, save_dir=None, show_legend=T
 
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 
-    
+
     if show_plot:
         plt.show()
         return fig, ax
-    else:
-        plt.close(fig)
-        return None
+    plt.close(fig)
+    return None
 
 
 def plot_koppen_geiger_map(path_to_file, shapefiles=None,
                            show_plot=True, show_legend=True,
                            show_title=True, savefig=False, save_dir=None,
                            class_names=None, rgb_colors=None, extent=None, filename=None, title=None):
-    """
-    Plot Köppen-Geiger raster map with optional shapefiles.
+    """Plot Köppen-Geiger raster map with optional shapefiles.
     Returns fig, ax.
     """
     path_to_file = Path(path_to_file)
@@ -508,7 +504,7 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
             [170, 175, 255], [90, 120, 220], [75, 80, 180], [50, 0, 135], [0, 255, 255],
             [55, 200, 255], [0, 125, 125], [0, 70, 95], [178, 178, 178], [102, 102, 102]
         ], dtype=float)/255
-    
+
     cmap = ListedColormap(np.array(rgb_colors))
     norm = BoundaryNorm(np.arange(0.5, len(class_names)+0.5, 1), cmap.N)
 
@@ -571,7 +567,7 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
 
     if savefig:
         fname = filename or f"{path_to_file.stem}.png"
-        save_path = Path(save_dir or ".") / fname 
+        save_path = Path(save_dir or ".") / fname
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     if show_plot:
@@ -583,8 +579,7 @@ def plot_koppen_geiger_map(path_to_file, shapefiles=None,
 
 def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
                            show_plot=True, save_dir=None, prefix="", title_prefix=""):
-    """
-    Plot percentage bar charts for map and shapefiles.
+    """Plot percentage bar charts for map and shapefiles.
     """
     class_names = class_names or df_percent.index.tolist()
     rgb_colors = np.array([
@@ -637,10 +632,9 @@ def plot_koppen_histograms(df_percent, class_names=None, shapefiles=None,
 def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None,
                           plot_map=True, plot_hist=True, generate_table=True,
                           save_dir=None, show_plot=False, return_fig=False):
-    """
-    High-level wrapper: compute counts, plot raster map, histograms, and generate tables.
+    """High-level wrapper: compute counts, plot raster map, histograms, and generate tables.
 
-    Returns
+    Returns:
     -------
     fig, ax : matplotlib objects (or None)
     df_percent : DataFrame of class percentages
@@ -724,18 +718,16 @@ def analyse_koppen_geiger(path_to_file, shapefiles=None, koppen_description=None
             save_pkl=pkl_file,
             caption=caption,
             label=label,
-            
+
         )
 
     # --- Return ---
     if return_fig:
         return fig, ax, df_percent, top_df
-    else:
-        return df_percent, top_df
+    return df_percent, top_df
 
 def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="1991_2020"):
-    """
-    Plot HIST and SSP lines for a given climate class over time.
+    """Plot HIST and SSP lines for a given climate class over time.
 
     Parameters
     ----------
@@ -752,21 +744,21 @@ def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="199
     hist_ref_period : str, optional
         Period row in HIST data to use as reference for SSPs, default "1991_2020".
 
-    Returns
+    Returns:
     -------
     fig, ax : matplotlib Figure and Axes
     """
     # HIST dataframe
     hist_df = topdf_all[topdf_all["ssp"] == "HIST"].copy()
-    
+
     # future SSPs
     ssps = topdf_all["ssp"].unique()
     ssps = [s for s in ssps if s != "HIST"]
     future_df = topdf_all[topdf_all["ssp"].isin(ssps)].copy()
-    
+
     # HIST reference row
     hist_ref = hist_df[hist_df["period"] == hist_ref_period].copy()
-    
+
     combined_ssp = []
     for ssp in ssps:
         df_ssp = future_df[future_df["ssp"] == ssp].copy()
@@ -775,32 +767,32 @@ def plot_climate_class_timeseries(topdf_all, climate_class, hist_ref_period="199
         hist_point["ssp"] = ssp
         df_ssp = pd.concat([hist_point, df_ssp], ignore_index=True)
         combined_ssp.append(df_ssp)
-    
+
     # all SSP lines combined
     ssp_plot_df = pd.concat(combined_ssp, ignore_index=True)
     ssp_plot_df = ssp_plot_df.sort_values(["ssp", "year_start"])
-    
+
     # Grab description
     desc = topdf_all.loc[topdf_all["climate_class"] == climate_class, "description"].iloc[0]
-    
+
     # Plot
     fig, ax = plt.subplots(figsize=(8, 4))
-    
+
     # HIST line
     hist_line = hist_df[hist_df["climate_class"] == climate_class].sort_values("year_start")
     ax.plot(hist_line["year_start"], hist_line["Plotted Area"], color="black", marker="o", label="HIST", zorder=20)
-    
+
     # SSP lines
     for ssp, g in ssp_plot_df[ssp_plot_df["climate_class"] == climate_class].groupby("ssp"):
         ax.plot(g["year_start"], g["Plotted Area"], marker="o", label=ssp)
-    
+
     ax.set_xlabel("Year")
     ax.set_ylabel("Area (%)")
-    ax.set_title(f"{climate_class} ({desc}) area fraction over time")  
+    ax.set_title(f"{climate_class} ({desc}) area fraction over time")
     ax.legend(title="Scenario")
     ax.grid(linestyle='--', alpha=0.5)
     plt.tight_layout()
-    
+
     return fig, ax
 
 

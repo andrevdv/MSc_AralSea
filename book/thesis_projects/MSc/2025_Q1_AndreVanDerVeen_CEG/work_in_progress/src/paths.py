@@ -1,5 +1,4 @@
-"""
-Module defining paths used throughout the project.
+"""Module defining paths used throughout the project.
 """
 from pathlib import Path
 
@@ -12,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]  # work_in_progress
 # Data folders
 # ------------------------------
 DATA = ROOT / "data"
-GRDC = DATA / "grdc"           
+GRDC = DATA / "grdc"
 BATHYMETRY = DATA / "bathymetry"
 SHAPEFILES = DATA / "shapefiles"
 KOPPEN_GEIGER = DATA / "koppen_geiger_tif"

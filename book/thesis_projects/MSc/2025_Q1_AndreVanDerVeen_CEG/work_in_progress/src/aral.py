@@ -1,34 +1,32 @@
-"""
-Aral Sea connected lake model.
+"""Aral Sea connected lake model.
 Based on daily water balance including river inflow and evaporation.
 """
-import pandas as pd
-from scipy.interpolate import interp1d
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from pathlib import Path
-import xarray as xr
-from src.constants import MAKKINK_FACTOR,GROUNDWATER_INFLOW
-from tqdm.notebook import tqdm
-from src.paths import GRDC,OUTPUT_HBV,BATHYMETRY,DAHITI
-import pickle
 import glob
 import os
+import pickle
+from pathlib import Path
 
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
+import xarray as xr
+from scipy.interpolate import interp1d
+from tqdm.notebook import tqdm
+
+from src.constants import GROUNDWATER_INFLOW, MAKKINK_FACTOR
+from src.paths import BATHYMETRY, DAHITI, GRDC, OUTPUT_HBV
 
 
 #Geometry stuff, needs update later to account for separate north and south basins
 class LakeGeometry:
-    """
-    Represent the geometry of a lake using an area-height-volume (AHV) relationship.
+    """Represent the geometry of a lake using an area-height-volume (AHV) relationship.
 
     This class provides methods to compute lake surface elevation and area
     from a given volume, based on an AHV curve loaded from CSV.
 
     TODO expand with north south split etc
 
-    Attributes
+    Attributes:
     ----------
     h_of_v : scipy.interpolate.interp1d
         Interpolation function for elevation (m) as a function of volume (km³).
@@ -36,8 +34,7 @@ class LakeGeometry:
         Interpolation function for area (km²) as a function of elevation (m).
     """
     def __init__(self, ahv_csv):
-        """
-        Initialize LakeGeometry from an area-height-volume (AHV) CSV file.
+        """Initialize LakeGeometry from an area-height-volume (AHV) CSV file.
 
         The CSV file must have columns:
             - elevation_m : lake surface elevation (meters)
@@ -56,7 +53,7 @@ class LakeGeometry:
         """
         if not Path(ahv_csv).exists():
             raise FileNotFoundError(f"AHV file not found: {ahv_csv}")
-        
+
         df = pd.read_csv(ahv_csv, sep=';', decimal=',').sort_values("elevation_m")
         self.df = df  # Store the DataFrame for potential future use
 
@@ -75,15 +72,14 @@ class LakeGeometry:
         )
 
     def elevation_from_volume(self, V_km3):
-        """
-        Compute lake surface elevation from volume using interpolation.
+        """Compute lake surface elevation from volume using interpolation.
 
         Parameters
         ----------
         V_km3 : float
             Lake volume in km³
 
-        Returns
+        Returns:
         -------
         float
             Lake surface elevation in meters
@@ -93,8 +89,7 @@ class LakeGeometry:
         return float(self.h_of_v(V_km3))
 
     def area_from_volume(self, V_km3):
-        """
-        Compute lake surface area from volume using interpolation.
+        """Compute lake surface area from volume using interpolation.
 
         Internally, it first computes elevation from volume, then uses the
         area-elevation relationship.
@@ -104,7 +99,7 @@ class LakeGeometry:
         V_km3 : float
             Lake volume in km³
 
-        Returns
+        Returns:
         -------
         float
             Lake surface area in km²
@@ -114,7 +109,7 @@ class LakeGeometry:
         h = self.elevation_from_volume(V_km3)
 
         return float(self.a_of_h(h))
-    
+
     def plot_ahv_curve(self):
         """Plot the area-height-volume relationships for validation."""
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -143,11 +138,10 @@ class LakeGeometry:
 
         fig.tight_layout()
         return fig, axes
-    
+
 class River:
     def __init__(self, data, q_col=None, name=None, factor: float = 86400/1e9, scaling: float = 1):
-        """
-        Wraps a river discharge time series for the lake model.
+        """Wraps a river discharge time series for the lake model.
 
         Parameters
         ----------
@@ -232,8 +226,7 @@ class River:
         plt.show()
 
     def plot_daily(self, skipna=True):
-        """
-        Plot daily discharge as a line chart.
+        """Plot daily discharge as a line chart.
         """
         daily = self.Q.copy()
         if skipna:
@@ -245,10 +238,9 @@ class River:
         plt.title(f'{self.name} Daily Discharge')
         plt.grid(True)
         plt.show()
-    
+
     def resample_5y_aligned(self, start_year: int, end_year: int, skipna=True) -> pd.DataFrame:
-        """
-        Compute yearly totals and then 5-year averages with aligned bins, returning a DataFrame.
+        """Compute yearly totals and then 5-year averages with aligned bins, returning a DataFrame.
         Index = first year of the bin, label as separate column.
 
         Parameters
@@ -260,7 +252,7 @@ class River:
         skipna : bool
             Whether to skip NaNs when aggregating
 
-        Returns
+        Returns:
         -------
         pd.DataFrame
             5-year average of yearly sums, index = first year of bin, 'bin_label' column included
@@ -299,8 +291,7 @@ class River:
 
     @classmethod
     def from_pickle(cls, pkl_path: Path, name: str = None, scaling: float = 1.0, q_col: str = "m3_s"):
-        """
-        Load a River object from a pickle saved by save_HBV_results.
+        """Load a River object from a pickle saved by save_HBV_results.
 
         Parameters
         ----------
@@ -325,8 +316,7 @@ class River:
 
 class MultiRiver:
     def __init__(self, rivers, q_col=None, factor: float = 86400/1e9, scaling: float = 1):
-        """
-        Wrapper for multiple rivers.
+        """Wrapper for multiple rivers.
 
         Parameters
         ----------
@@ -368,12 +358,11 @@ class MultiRiver:
         plt.legend()
         plt.show()
 
-    
+
 
 #fluxes
 def discharge_to_km3day(Q_m3s):
-    """
-    converts discharge from m3s to km3day
+    """Converts discharge from m3s to km3day
     
     :param Q_m3s: Description
     """
@@ -381,8 +370,7 @@ def discharge_to_km3day(Q_m3s):
 
 
 def compute_total_river_inflow(i, rivers, connected=True):
-    """
-    Compute river inflow(s) for timestep i.
+    """Compute river inflow(s) for timestep i.
 
     Parameters
     ----------
@@ -394,21 +382,19 @@ def compute_total_river_inflow(i, rivers, connected=True):
         If True, sum all rivers into one inflow
         If False, can be used for split-lake routing (future)
 
-    Returns
+    Returns:
     -------
     float
         Total inflow (connected case)
     """
     if connected:
         return sum(r.Q.iloc[i] for r in rivers)
-    else:
-        # Placeholder for future north/south split
-        # e.g., return {'north': rivers[1].Q.iloc[i], 'south': rivers[0].Q.iloc[i]}
-        return sum(r.Q.iloc[i] for r in rivers)
+    # Placeholder for future north/south split
+    # e.g., return {'north': rivers[1].Q.iloc[i], 'south': rivers[0].Q.iloc[i]}
+    return sum(r.Q.iloc[i] for r in rivers)
 
 def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
-    """
-    Convert potential evaporation flux to km3/day.
+    """Convert potential evaporation flux to km3/day.
 
     Parameters
     ----------
@@ -417,14 +403,14 @@ def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     area_km2 : float
         Lake area in km^2
 
-    Returns
+    Returns:
     -------
     float
         Evaporation in km3/day
     """
     # kg/m²/s → mm/day
     evap_mm_day = evap_flux_kg_m2_s * 86400
-    
+
     # mm/day → km³/day
     evap_km3_day = evap_mm_day / 1e6 * area_km2
 
@@ -433,8 +419,7 @@ def compute_evaporation_km3day(evap_flux_kg_m2_s, area_km2):
     return evap_km3_day
 
 def compute_precip_km3day(precip_mm_day, area_km2):
-    """
-    Convert potential precip flux to km3/day. very rudimenteray right now
+    """Convert potential precip flux to km3/day. very rudimenteray right now
 
     TODO expand this.
 
@@ -446,13 +431,13 @@ def compute_precip_km3day(precip_mm_day, area_km2):
     area_km2 : float
         Lake area in km^2
 
-    Returns
+    Returns:
     -------
     float
         precip in km3/day
     """
     # kg/m²/s → mm/day
-    
+
     # mm/day → km³/day
     precip_km3_day = precip_mm_day / 1e6 * area_km2
 
@@ -471,8 +456,7 @@ def update_volume(
     scale_inflow=1.0,
     precip=0,
 ):
-    """
-    updates the volume for the volume balance model. rudimentary right now.
+    """Updates the volume for the volume balance model. rudimentary right now.
     """
     V_new = (
         V_prev
@@ -495,8 +479,7 @@ def run_connected_aral_model(
     tqdm_position: int = 0,
     aral_precip: xr.Dataset = None,  # xarray Dataset with meteo forcing, must containg [evspsblpot]
 )-> pd.DataFrame:
-    """
-    Connected Aral Sea daily water balance model.
+    """Connected Aral Sea daily water balance model.
 
     Parameters
     ----------
@@ -509,12 +492,11 @@ def run_connected_aral_model(
     V0_km3 : float
         Initial lake volume [km3]
 
-    Returns
+    Returns:
     -------
     pandas.DataFrame
         Columns: time, volume_km3, area_km2, elevation_m
     """
-
         # --- Slice meteorological forcing ---
     if start_time is not None or end_time is not None:
         aral_meteo = aral_meteo.sel(
@@ -571,7 +553,7 @@ def run_connected_aral_model(
         V.iloc[i] = update_volume(V.iloc[i-1], Q_in, evap, precip= precip)
 
 
-            
+
 
     return pd.DataFrame({
         "time": aral_meteo.time.values[:n],
@@ -585,8 +567,7 @@ def run_connected_aral_model(
 
 
 def plot_aral_results(results, labels=None, observations=None):
-    """
-    Plot one or more Aral Sea simulation results side-by-side, optionally with observations.
+    """Plot one or more Aral Sea simulation results side-by-side, optionally with observations.
 
     Parameters
     ----------
@@ -599,12 +580,11 @@ def plot_aral_results(results, labels=None, observations=None):
         Observation datasets to overlay. Each tuple: (DataFrame, label)
         DataFrame must have columns 'time' and 'elevation_m'
 
-    Returns
+    Returns:
     -------
     None
         Displays a matplotlib figure.
     """
-    import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
 
     # Ensure results is a list
@@ -612,7 +592,7 @@ def plot_aral_results(results, labels=None, observations=None):
         results = [results]
 
     n_results = len(results)
-    
+
     # Default labels
     if labels is None:
         labels = [f'Simulation {i+1}' for i in range(n_results)]
@@ -663,8 +643,7 @@ def plot_aral_results(results, labels=None, observations=None):
     plt.show()
 
 def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
-    """
-    Plot ensemble Aral Sea simulation results with optional observations.
+    """Plot ensemble Aral Sea simulation results with optional observations.
 
     Parameters
     ----------
@@ -680,7 +659,6 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
         DataFrame must have columns 'time' and 'elevation_m'
 
     """
-    import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
 
     if not isinstance(sim_results, list):
@@ -751,8 +729,7 @@ def plot_aral_ensemble_results(sim_results, groups=None, observations=None):
     plt.show()
 
 def plot_aral_fluxes(df):
-    """
-    Plot yearly inflow, evaporation, and net flux for the Aral Sea simulation.
+    """Plot yearly inflow, evaporation, and net flux for the Aral Sea simulation.
 
     Creates three side-by-side subplots with the same y-axis scale for inflow and evaporation.
 
@@ -764,7 +741,7 @@ def plot_aral_fluxes(df):
         - 'Q_in_km3day' : daily inflow in km³/day
         - 'evap_km3day' : daily evaporation in km³/day
 
-    Returns
+    Returns:
     -------
     None
     """
@@ -810,8 +787,7 @@ def plot_aral_fluxes(df):
     plt.show()
 
 def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
-    """
-    Save Aral Sea simulation results in CSV, pickle, and NetCDF formats.
+    """Save Aral Sea simulation results in CSV, pickle, and NetCDF formats.
 
     Parameters
     ----------
@@ -822,7 +798,7 @@ def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
     prefix : str, default "aral_sim"
         Prefix for the saved files.
 
-    Returns
+    Returns:
     -------
     dict
         Paths of the saved files.
@@ -852,8 +828,7 @@ def save_aral_simulation(aral_df, save_dir, prefix="aral_sim"):
     return paths
 
 def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFrame:
-    """
-    Load a GRDC monthly discharge file and return a clean DataFrame
+    """Load a GRDC monthly discharge file and return a clean DataFrame
     indexed by datetime with monthly frequency.
 
     Parameters
@@ -863,7 +838,7 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
     q_col : str
         Column name to select as discharge
 
-    Returns
+    Returns:
     -------
     pd.DataFrame
         DataFrame with datetime index (month start) and discharge column
@@ -894,8 +869,7 @@ def load_grdc_monthly(grdc_id: int , q_col="Original", name="None") -> pd.DataFr
     return River(df, q_col=q_col, name=name)
 
 def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
-    """
-    Load River objects for a given station, both ERA5 and CMIP_HIST.
+    """Load River objects for a given station, both ERA5 and CMIP_HIST.
     
     Parameters
     ----------
@@ -906,33 +880,32 @@ def load_rivers(station_name, scaling_era5=1.0, scaling_cmip=1.0):
     scaling_cmip : float
         Scaling factor for CMIP_HIST pickles.
         
-    Returns
+    Returns:
     -------
     dict
         Dictionary with keys 'ERA5' and 'CMIP_HIST', values are lists of aral.River objects.
     """
     station_dir = OUTPUT_HBV / station_name
-    
+
     # ERA5
     pkl_files_era5 = sorted(station_dir.glob(f"ERA5/{station_name}_ERA5_1940-2020_cmaes_*.pkl"))
     rivers_era5 = [River.from_pickle(pkl, scaling=scaling_era5) for pkl in pkl_files_era5]
-    
+
     # CMIP_HIST
     pkl_files_cmip = sorted(station_dir.glob(f"CMIP_HIST/{station_name}_CMIP_HIST_1940-2014_cmaes_*.pkl"))
     rivers_cmip = [River.from_pickle(pkl, scaling=scaling_cmip) for pkl in pkl_files_cmip]
-    
+
     return {"ERA5": rivers_era5, "CMIP_HIST": rivers_cmip}
 
 
 def make_obs(): #csv_file: Path, nc_folder: Path):
-    """
-    Load historical CSV and DAHITI NetCDF water level observations
+    """Load historical CSV and DAHITI NetCDF water level observations
     and return a list of tuples (DataFrame, label).
 
     Parameters
     ----------
 
-    Returns
+    Returns:
     -------
     obs_list : list of tuples
         Each tuple is (df, label), where df has columns ['time', 'elevation_m']

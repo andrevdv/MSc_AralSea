@@ -1,5 +1,4 @@
-"""
-Utility functions for hydrological modeling and geospatial data processing
+"""Utility functions for hydrological modeling and geospatial data processing
 within the eWaterCycle framework. Includes functions for:
 
 - Catchment area calculation
@@ -9,11 +8,11 @@ within the eWaterCycle framework. Includes functions for:
 """
 import configparser
 import re
-from collections import Counter
+from collections.abc import Sequence
 from datetime import datetime
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Union
 
 import fiona
 import numpy as np
@@ -21,20 +20,13 @@ import pandas as pd
 import rasterio
 import rasterio.mask
 from pyproj import Geod
-from shapely.geometry import box, mapping, shape
+from shapely.geometry import shape
 
-from src.paths import SHAPEFILES, INI_COMPARISON
-
-
-import requests
-import json
-import pprint
-import os
+from src.paths import INI_COMPARISON, SHAPEFILES
 
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
-    """
-    Compute the area (in m²) of the first polygon in a shapefile.
+    """Compute the area (in m²) of the first polygon in a shapefile.
 
     Parameters
     ----------
@@ -43,7 +35,7 @@ def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     ellps : str, optional
         Ellipsoid for area calculation (default: WGS84)
 
-    Returns
+    Returns:
     -------
     float
         Absolute area of the polygon in square meters
@@ -63,8 +55,7 @@ def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     return abs(area)
 
 def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
-    """
-    Convert HBV model output from mm/day to m³/s using catchment area.
+    """Convert HBV model output from mm/day to m³/s using catchment area.
 
     Parameters
     ----------
@@ -73,12 +64,12 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
     shape_name : str
         Name of the shapefile defining the catchment. Used to compute catchment area.
 
-    Returns
+    Returns:
     -------
     pd.Series
         Discharge converted to cubic meters per second (m³/s).
 
-    Notes
+    Notes:
     -----
     Catchment area is obtained using `catchment_area_from_shapefile`.
     """
@@ -91,9 +82,9 @@ def mmday_to_m3s(model_output: pd.Series, shape_name: str) -> pd.Series:
     return model_output_m3s
 
 
-@lru_cache(maxsize=None)
+@cache
 def _get_catchment_area(shape_name: str) -> float:
-    "Cached helper to retrieve catchment area to avoid repeated computations."
+    """Cached helper to retrieve catchment area to avoid repeated computations."""
     return catchment_area_from_shapefile(shape_name)
 
 
@@ -103,8 +94,7 @@ def get_integer_multiple_bounds(
     shapefiles: Union[str, Path, Sequence[Union[str, Path]]],
     multiple: int = 3,
 ):
-    """
-    Get the bounding box of one or more shapefiles, expanded to the nearest integer
+    """Get the bounding box of one or more shapefiles, expanded to the nearest integer
     multiples.
     Parameters
     ----------
@@ -112,7 +102,8 @@ def get_integer_multiple_bounds(
         Path(s) to the shapefile(s).
     multiple : int, optional    
         The multiple to which the bounds should be expanded (default is 3).
-    Returns
+
+    Returns:
     -------
     tuple
         A tuple containing (lon_min, lat_min, lon_max, lat_max) expanded to the nearest multiples.
@@ -175,8 +166,7 @@ def _generate_comparison_filename(file1, file2):
     return INI_COMPARISON / filename
 
 def compare_inis(file1, file2): #, save_file=None):
-    """
-    Compare two PCR-GLOBWB2 INI files and report differences.
+    """Compare two PCR-GLOBWB2 INI files and report differences.
 
     Parameters
     ----------
@@ -185,13 +175,13 @@ def compare_inis(file1, file2): #, save_file=None):
     file2 : str or Path
         Path to the second INI file.
 
-    Returns
+    Returns:
     -------
     None
         Differences are printed to the console and also saved to a file
         named "diff_file1_file2.txt" in the current directory.
 
-    Notes
+    Notes:
     -----
     Output file is automatically named based on the two input filenames.
     """
@@ -465,7 +455,7 @@ def _export_daily_monthly_tables(
             latex_daily, encoding="utf-8"
         )
 
-    
+
 
 def build_grdc_metadata_table(
     folder_path: Path,
@@ -473,8 +463,7 @@ def build_grdc_metadata_table(
     split_daily_monthly: bool = True,
     base_filename: str = "grdc_selected_metadata",
 ) -> pd.DataFrame:
-    """
-    Build cleaned GRDC station metadata tables from raw text files.
+    """Build cleaned GRDC station metadata tables from raw text files.
 
     This function reads all GRDC station .txt files in a folder, extracts metadata,
     formats numeric and coordinate columns, filters non-empty time series, sanitizes
@@ -491,7 +480,7 @@ def build_grdc_metadata_table(
     base_filename : str, default "grdc_selected_metadata"
         Base name for exported LaTeX files (without suffix).
 
-    Returns
+    Returns:
     -------
     pd.DataFrame
         Cleaned metadata table for all stations.
@@ -556,8 +545,7 @@ KOPPEN_DESCRIPTION = {
 
 
 def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None, extent=None):
-    """
-    Compute pixel counts for Köppen-Geiger classes for raster and optional shapefiles.
+    """Compute pixel counts for Köppen-Geiger classes for raster and optional shapefiles.
 
     Parameters
     ----------
@@ -569,7 +557,7 @@ def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None,
     class_names : list of str, optional
         List of Köppen class names. Defaults to 30 standard classes.
 
-    Returns
+    Returns:
     -------
     df_counts : pandas.DataFrame
         Raw counts for raster and shapefiles.
@@ -638,8 +626,7 @@ def generate_koppen_tables(
         caption=None,
         label=None,
     ):
-    """
-    Produce top-N class table with 'Other', optionally save as LaTeX / Markdown.
+    """Produce top-N class table with 'Other', optionally save as LaTeX / Markdown.
 
     Parameters
     ----------
@@ -654,7 +641,7 @@ def generate_koppen_tables(
     save_md : str or Path, optional
         Path to save Markdown table.
 
-    Returns
+    Returns:
     -------
     top_df : pandas.DataFrame
         Processed top-N table with percentages.
@@ -721,7 +708,7 @@ def generate_koppen_tables(
             header = "| " + " | ".join(top_df.columns) + " |"
             # Right-align numeric columns using :---:
             separator = "| " + " | ".join(
-                "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---" 
+                "---:" if col in [f"{c} (%)" for c in numeric_cols] else "---"
                 for col in top_df.columns
             ) + " |"
             rows = ["| " + " | ".join(map(str, row)) + " |" for row in top_df.values]
@@ -737,8 +724,7 @@ def generate_koppen_tables(
     return top_df
 
 def get_combined_extent(shapefiles, padding=1.0):
-    """
-    Return combined lon/lat bounds of multiple shapefiles with optional padding.
+    """Return combined lon/lat bounds of multiple shapefiles with optional padding.
     
     Parameters
     ----------
@@ -747,17 +733,17 @@ def get_combined_extent(shapefiles, padding=1.0):
     padding : float
         Degrees to extend bounds
     
-    Returns
+    Returns:
     -------
     lon_min, lat_min, lon_max, lat_max : float
     """
     if not shapefiles:
         # fallback extent
         return 54, 33, 82, 53
-    
+
     lon_min, lat_min = float("inf"), float("inf")
     lon_max, lat_max = float("-inf"), float("-inf")
-    
+
     for cfg in shapefiles.values():
         with fiona.open(cfg["path"]) as src:
             for feat in src:
@@ -767,13 +753,12 @@ def get_combined_extent(shapefiles, padding=1.0):
                 lat_min = min(lat_min, by)
                 lon_max = max(lon_max, Bx)
                 lat_max = max(lat_max, By)
-    
+
     return lon_min - padding, lat_min - padding, lon_max + padding, lat_max + padding
 
 
 def extract_scenario_and_year(path):
-    """
-    Extract year range and scenario (if any) from raster path.
+    """Extract year range and scenario (if any) from raster path.
     """
     parts = Path(path).parts
     # Year folder is assumed to be immediately under KOPPEN_GEIGER
@@ -787,19 +772,21 @@ def extract_scenario_and_year(path):
     return year_range, scenario
 
 from pathlib import Path
+
 import pandas as pd
+
 from src.constants import KOPPEN_DESCRIPTION
 
+
 def load_koppen_pickles_from_folder(pkl_folder):
-    """
-    Load all Köppen-Geiger pickle outputs from a folder, add period, SSP, year, and description.
+    """Load all Köppen-Geiger pickle outputs from a folder, add period, SSP, year, and description.
 
     Parameters
     ----------
     pkl_folder : str or Path
         Path to folder containing pickle files for one shapefile.
 
-    Returns
+    Returns:
     -------
     pd.DataFrame
         Concatenated DataFrame with columns:

@@ -1,5 +1,4 @@
-"""
-Constants for the Aral Sea thesis project.
+"""Constants for the Aral Sea thesis project.
 
 Includes:
 - HBV model parameter bounds and defaults
@@ -118,7 +117,7 @@ OBJECTIVE_WEIGHTS = {
 # ==============================================================================
 # Default CMIP6 models
 DEFAULT_CMIP6_MODELS = {
-"historical": "MPI-ESM1-2-HR", 
+"historical": "MPI-ESM1-2-HR",
 "future": "MPI-ESM1-2-HR" #, EC-Earth3
 }
 

@@ -1,5 +1,4 @@
-"""
-Climate forcing data generation and processing.
+"""Climate forcing data generation and processing.
 
 This module handles the preparation of meteorological forcing data for
 hydrological models within the eWaterCycle framework. It supports:
@@ -16,9 +15,16 @@ import matplotlib.pyplot as plt
 import xarray as xr
 import xesmf as xe
 
-from src.paths import SHAPEFILES, FORCING_ERA5, FORCING_CMIP_HIST, FORCING_CMIP_FUT, FORCING_PCRGLOB, FORCING_OUTPUT
-from src.utils import get_integer_multiple_bounds
 from src.constants import DEFAULT_CMIP6_MODELS
+from src.paths import (
+    FORCING_CMIP_FUT,
+    FORCING_CMIP_HIST,
+    FORCING_ERA5,
+    FORCING_OUTPUT,
+    FORCING_PCRGLOB,
+    SHAPEFILES,
+)
+from src.utils import get_integer_multiple_bounds
 
 # ===========================================================================
 # FORCING GENERATION (LUMPED)
@@ -36,8 +42,7 @@ from src.constants import DEFAULT_CMIP6_MODELS
 
 
 def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
-    """
-    Generate ERA5 forcing data for a lumped basin defined by a shapefile.
+    """Generate ERA5 forcing data for a lumped basin defined by a shapefile.
 
     Parameters
     ----------
@@ -48,7 +53,7 @@ def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
     end : str
         End date in ISO format (YYYY-MM-DD or full ISO timestamp).
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         ERA5-based forcing object written to NetCDF files on disk.
@@ -80,8 +85,7 @@ def generate_lumped_ERA5_forcing(shape_name: str, start: str, end: str):
     return forcing
 
 def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str, model:str=DEFAULT_CMIP6_MODELS['historical']):
-    """
-    Generate CMIP6 historical forcing data for a lumped basin.
+    """Generate CMIP6 historical forcing data for a lumped basin.
 
     Parameters
     ----------
@@ -94,23 +98,23 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
     model : str, optional
         CMIP6 climate model name, by default "MPI-ESM1-2-HR".
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         CMIP6 historical forcing object written to NetCDF files on disk.
     """
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
-    
+
     #year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
     # Directory where forcing outputs will be stored
     forcing_dir =(
-        FORCING_CMIP_HIST 
+        FORCING_CMIP_HIST
         / shape_name
         / year_span
-    ) 
+    )
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
     cmip_historical =  {
@@ -132,8 +136,7 @@ def generate_lumped_CMIP_historical_forcing(shape_name:str, start: str, end:str,
     return CMIP_forcing
 
 def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp:str="ssp245", model:str=DEFAULT_CMIP6_MODELS["future"]):
-    """
-    Generate CMIP6 future scenario forcing data for a lumped basin.
+    """Generate CMIP6 future scenario forcing data for a lumped basin.
 
     Parameters
     ----------
@@ -148,16 +151,14 @@ def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp
     model : str, optional
         CMIP6 climate model name, by default "EC-Earth3".
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         CMIP6 future forcing object written to NetCDF files on disk.
     """
-
-
     # Path to the shapefile
     shapefile = SHAPEFILES / shape_name / f"{shape_name}.shp"
-    
+
     #year for naming
     year_span = f"{start[:4]}-{end[:4]}"
 
@@ -168,7 +169,7 @@ def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp
         / ssp
         / shape_name
         / year_span
-    ) 
+    )
 
 
     forcing_dir.mkdir(parents=True, exist_ok=True)
@@ -194,8 +195,7 @@ def generate_lumped_CMIP_future_forcing(shape_name:str, start: str, end:str, ssp
     return CMIP_forcing
 
 def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str, base_forcing_dir=None):
-    """
-    Load previously generated lumped forcing data for a given shapefile.
+    """Load previously generated lumped forcing data for a given shapefile.
 
     Parameters
     ----------
@@ -207,13 +207,11 @@ def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str,
         Base directory where forcing outputs are stored.
         If None, defaults to FORCING_OUTPUT from paths.py
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         Loaded forcing object
     """
-
-
     # Use default forcing output folder if none provided
     if base_forcing_dir is None:
         base_forcing_dir = FORCING_OUTPUT
@@ -223,19 +221,18 @@ def load_lumped_forcing_data(shape_name: str, forcing_type: str, year_span: str,
 
     # Load the forcing
     forcing = ewatercycle.forcing.sources["LumpedMakkinkForcing"].load(directory=load_location)
-    
+
     return forcing
 
 def _ensure_dataset(obj):
-    """
-    Ensure the object is an xarray.Dataset.
+    """Ensure the object is an xarray.Dataset.
 
     Parameters
     ----------
     obj : xarray.Dataset or str / Path
         If a path, the dataset will be opened using xr.open_dataset.
 
-    Returns
+    Returns:
     -------
     xr.Dataset
         Dataset object.
@@ -246,8 +243,7 @@ def _ensure_dataset(obj):
 
 
 def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
-    """
-    Plot precipitation, temperature, shortwave radiation, and potential evaporation
+    """Plot precipitation, temperature, shortwave radiation, and potential evaporation
     from a loaded ERA5 forcing object.
 
     Parameters
@@ -257,7 +253,6 @@ def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
     shape_name : str, optional
         Name of the catchment/shapefile, added to title if provided.
     """
-
     ERA5_data = {
         'precipitation pr': _ensure_dataset(forcing_obj['pr']),
         'temperature tas': _ensure_dataset(forcing_obj['tas']),
@@ -273,19 +268,18 @@ def plot_lumped_ERA5_forcing(forcing_obj, shape_name: str = None):
         data[variable_name].plot()
         plt.title(f"{title_name}")
         plt.grid(linestyle="--",alpha=0.5)
-            
+
     if shape_name:
         plt.suptitle(f"ERA5 LumpedMakkink Forcing Data \n (shapefile = {shape_name})", fontsize=20)
     else:
-        plt.suptitle(f"ERA5 LumpedMakkink Forcing Data", fontsize=20)
+        plt.suptitle("ERA5 LumpedMakkink Forcing Data", fontsize=20)
     plt.tight_layout()
     plt.show()
 
 
 #NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
 def create_forcing_slice(forcing_obj, start, end):
-    """
-    Temporarily slice ERA5 forcing data in memory.
+    """Temporarily slice ERA5 forcing data in memory.
     To use in HBV (and Leakybucket?)
 
     NOT WORKING FOR NOW, HBV ONLY ACCEPTS REAL EWATERCYCLE FORCING
@@ -297,7 +291,7 @@ def create_forcing_slice(forcing_obj, start, end):
     start, end : str
         Time slice, e.g. "1990-01-01", "2014-12-31"
 
-    Returns
+    Returns:
     -------
     dict[str, xarray.Dataset]
         Sliced datasets (not written to disk)
@@ -324,8 +318,7 @@ def create_forcing_slice(forcing_obj, start, end):
 # ===========================================================================
 
 def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
-    """
-    Setup and generate forcing data for a given shapefile.
+    """Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
 
     Parameters
@@ -337,7 +330,7 @@ def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
     end : str
         End date in ISO format, e.g., "2020-12-31T00:00:00Z"
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         The generated forcing object
@@ -378,12 +371,11 @@ def generate_PCRGLOBWB_ERA5_forcing(shape_name: str, start: str, end: str):
         "end_latitude": lat_max_f + esmvaltool_padding,},
         directory = forcing_dir
         )
-    
+
     return pcrglobwb_forcing
 
 def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end: str, model:str= DEFAULT_CMIP6_MODELS['historical'] ,ensemble:str = "r1i1p1f1"):
-    """
-    Setup and generate forcing data for a given shapefile.
+    """Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
 
     Parameters
@@ -395,7 +387,7 @@ def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end:
     end : str
         End date in ISO format, e.g., "2020-12-31T00:00:00Z"
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         The generated forcing object
@@ -447,12 +439,11 @@ def generate_PCRGLOBWB_CMIP_historical_forcing(shape_name: str, start: str, end:
         "end_latitude": lat_max_f + esmvaltool_padding,},
         directory = forcing_dir
         )
-    
+
     return pcrglobwb_forcing
 
 def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str,ssp: str, model:str = DEFAULT_CMIP6_MODELS["future"], ensemble:str = "r1i1p1f1"):
-    """
-    Setup and generate forcing data for a given shapefile.
+    """Setup and generate forcing data for a given shapefile.
     To be used with PCR-GLOBWB model.
 
     Parameters
@@ -464,7 +455,7 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
     end : str
         End date in ISO format, e.g., "2020-12-31T00:00:00Z"
 
-    Returns
+    Returns:
     -------
     ewatercycle.forcing.Forcing
         The generated forcing object
@@ -523,7 +514,7 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
         "end_latitude": lat_max_f + esmvaltool_padding,},
         directory = forcing_dir
         )
-    
+
     return pcrglobwb_forcing
 
 
@@ -532,12 +523,11 @@ def generate_PCRGLOBWB_CMIP_future_forcing(shape_name: str, start: str, end: str
 # REGRIDDING
 # - Regrid CMIP forcing to ERA5 grid
 # - Applies to precipitation and temperature variables
-# - Overwrites original CMIP files 
+# - Overwrites original CMIP files
 # ===========================================================================
 
 def regrid_pcrglobwb_forcing(cmip_forcing, era5_forcing):
-    """
-    Regrid CMIP PCR-GLOBWB forcing to match ERA5 grid.
+    """Regrid CMIP PCR-GLOBWB forcing to match ERA5 grid.
 
     Parameters
     ----------
@@ -546,12 +536,12 @@ def regrid_pcrglobwb_forcing(cmip_forcing, era5_forcing):
     era5_forcing : PCRGlobWBForcing
         ERA5 forcing object providing the target grid.
 
-    Returns
+    Returns:
     -------
     None
         NetCDF files in cmip_forcing.directory are overwritten.
 
-    Notes
+    Notes:
     -----
     - Original CMIP files are modified. Backup recommended.
     - Applies variable-aware regridding to precipitation and temperature.
@@ -571,8 +561,7 @@ def _regrid_cmip_forcing_to_era5(
     era5_path,
     overwrite=True,
 ):
-    """
-    Internal Helper, Regrid CMIP forcing exactly onto ERA5 grid.
+    """Internal Helper, Regrid CMIP forcing exactly onto ERA5 grid.
 
     Parameters
     ----------
@@ -583,12 +572,11 @@ def _regrid_cmip_forcing_to_era5(
     overwrite : bool
         Overwrite CMIP file after regridding.
 
-    Returns
+    Returns:
     -------
     xr.Dataset
         Regridded dataset.
     """
-
     cmip_path = Path(cmip_path)
     era5_path = Path(era5_path)
 
@@ -604,10 +592,7 @@ def _regrid_cmip_forcing_to_era5(
     forcing_type = detect_forcing_variable(ds_cmip)
 
     # Choose regridding method
-    if forcing_type == "precipitation":
-        method = "bilinear"
-        extrap_method = "nearest_s2d"
-    elif forcing_type == "temperature":
+    if forcing_type == "precipitation" or forcing_type == "temperature":
         method = "bilinear"
         extrap_method = "nearest_s2d"
     else:
@@ -636,15 +621,13 @@ def _regrid_cmip_forcing_to_era5(
     return ds_out
 
 def detect_forcing_variable(ds):
-    """
-    Detect forcing variable type from dataset.
+    """Detect forcing variable type from dataset.
 
-    Returns
+    Returns:
     -------
     str
         One of: 'precipitation', 'temperature'
     """
-
     varnames = set(ds.data_vars)
 
     precip_vars = {"pr", "precipitation", "tp"}

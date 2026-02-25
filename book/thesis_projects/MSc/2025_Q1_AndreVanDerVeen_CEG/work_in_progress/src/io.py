@@ -1,7 +1,6 @@
-import requests
-import json
-import pprint
 import os
+
+import requests
 
 
 def download_dahiti_water_level(
@@ -10,8 +9,7 @@ def download_dahiti_water_level(
     file_format: str = "netcdf",
     download_folder: str = "downloads"
 ):
-    """
-    Download water level data from DAHITI for one or multiple IDs.
+    """Download water level data from DAHITI for one or multiple IDs.
 
     Parameters
     ----------
@@ -24,12 +22,11 @@ def download_dahiti_water_level(
     download_folder : str
         Folder to save downloaded files (default: 'downloads')
 
-    Returns
+    Returns:
     -------
     dict
         Mapping of dahiti_id -> downloaded file path (netcdf) or data (ascii/json/csv)
     """
-
     if isinstance(dahiti_ids, int):
         dahiti_ids = [dahiti_ids]
 

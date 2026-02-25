@@ -1,15 +1,12 @@
-"""
-Module for hydrological model simulations and calibration.
+"""Module for hydrological model simulations and calibration.
 Includes functions to run HBV and PCR-GLOBWB models,
 generate parameters, run ensembles, and perform CMA-ES calibration.
 """
 
-import json
 import os
 import pickle
 import shutil
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 
 import cma
@@ -19,15 +16,14 @@ import pandas as pd
 import xarray as xr
 from tqdm.notebook import tqdm
 
-from src.paths import INI_FILES, OUTPUT_HBV
-from src.utils import catchment_area_from_shapefile, mmday_to_m3s
-from src.paths import PCR_GLOBAL_PARAMS
 from src.constants import HBV_PARAM_BOUNDS, PARAMETER_NAMES
 from src.forcing import load_lumped_forcing_data
+from src.paths import INI_FILES, OUTPUT_HBV, PCR_GLOBAL_PARAMS
+from src.utils import mmday_to_m3s
+
 
 def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True, delete_files = False, leave_pbar = True):
-    """
-    Run the HBV model with a given forcing and parameters.
+    """Run the HBV model with a given forcing and parameters.
 
     Parameters
     ----------
@@ -40,7 +36,7 @@ def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True,
     show_progress : bool
         If True, show a tqdm progress bar
 
-    Returns
+    Returns:
     -------
     pd.Series
         Modelled discharge time series
@@ -90,8 +86,7 @@ def simulate_HBV(forcing, parameter_set, initial_conditions, show_progress=True,
     return model_output
 
 def plot_HBV_output(model_output: pd.Series):
-    """
-    Plot the HBV model output time series.
+    """Plot the HBV model output time series.
 
     Parameters
     ----------
@@ -110,9 +105,8 @@ def plot_HBV_output(model_output: pd.Series):
     plt.show()
 
 
-def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str, run_tag: str = None,parameters: dict = None): 
-    """
-    Save HBV model output as CSV, NetCDF, and pickle.
+def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str, run_tag: str = None,parameters: dict = None):
+    """Save HBV model output as CSV, NetCDF, and pickle.
     Also converts results to m3/s using shapefile
 
     Parameters
@@ -142,7 +136,7 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
 
     # generate name
     base_filename = f"{shape_name}_{forcing_type}_{start_year}-{end_year}"
-    
+
     if run_tag is not None:
         base_filename = f"{base_filename}_{run_tag}"
 
@@ -189,12 +183,11 @@ def save_HBV_results(model_output: pd.Series, shape_name: str, forcing_type: str
     nc_file = output_dir / f"{base_filename}.nc"
 
     ds.to_netcdf(nc_file)
-    
+
     return {"csv": csv_file, "pkl": pkl_file, "nc": nc_file}
 
 def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
-    """
-    Run the PCR-GLOBWB hydrological model for a given forcing and configuration.
+    """Run the PCR-GLOBWB hydrological model for a given forcing and configuration.
 
     This function sets up and executes a PCR-GLOBWB simulation using the 
     specified forcing data and parameter INI file. Currently, it relies on 
@@ -213,14 +206,14 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
     end_date : str
         End date of the simulation in ISO 8601 format (e.g., "2020-12-31T00:00:00Z").
 
-    Returns
+    Returns:
     -------
     None
         The function writes output to the eWaterCycle-managed model directory.
         Results can be accessed from the `model.output_dir` or via other
         eWaterCycle utilities.
 
-    Notes
+    Notes:
     -----
     - The function currently hardcodes the location of global parameter sets:
       `/data/shared/parameter-sets/pcrglobwb_global`.
@@ -243,7 +236,7 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
 
     # can be hardcoded, location of all the pcr-glob data on ewatercycle
     pcr_glob_directory = PCR_GLOBAL_PARAMS
-    
+
 
     forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].load(
     directory=forcing_path,
@@ -284,21 +277,20 @@ def simulate_PCRGLOBWB(forcing_path,ini_name, start_date,end_date):
     model.finalize()
 
 def generate_HBV_parameters(n_particles: int):
-    """
-    Generate a set of HBV model parameter vectors.
+    """Generate a set of HBV model parameter vectors.
 
     Parameters
     ----------
     n_particles : int
         Number of parameter vectors to generate.
 
-    Returns
+    Returns:
     -------
     list of dict
         Each element is a dictionary containing a full set of HBV parameters
         for a single particle/run.
 
-    Notes
+    Notes:
     -----
     Parameters are randomly sampled within predefined ranges.
     """
@@ -311,8 +303,7 @@ def generate_HBV_parameters(n_particles: int):
     return generated_parameters
 
 def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
-    """
-    Run multiple HBV simulations as an ensemble.
+    """Run multiple HBV simulations as an ensemble.
 
     Parameters
     ----------
@@ -323,7 +314,7 @@ def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
     delete_files : bool, default True
         If True, intermediate files are deleted after the simulation.
 
-    Returns
+    Returns:
     -------
     list of pd.Series
         Each element contains the simulated discharge time series for one particle.
@@ -344,7 +335,7 @@ def simulate_HBV_ensemble(n_particles: int, forcing, delete_files = True):
             leave_pbar=False,
         )
         all_series.append(s)
-    
+
     df_all = pd.concat(all_series, axis=1)
     df_all.columns = [f"particle_{i}" for i in range(n_particles)]
 
@@ -384,15 +375,14 @@ p_max = HBV_PARAM_BOUNDS['max']
 
 # scale parameters
 def scale(theta):
-    """
-    Scale a physical HBV parameter vector to normalized [0,1] values.
+    """Scale a physical HBV parameter vector to normalized [0,1] values.
 
     Parameters
     ----------
     theta : array-like
         Physical parameter vector.
 
-    Returns
+    Returns:
     -------
     np.ndarray
         Normalized parameter vector with values in [0,1].
@@ -400,15 +390,14 @@ def scale(theta):
     return (theta - p_min) / (p_max - p_min)
 
 def unscale(x):
-    """
-    Convert a normalized [0,1] HBV parameter vector back to physical units.
+    """Convert a normalized [0,1] HBV parameter vector back to physical units.
 
     Parameters
     ----------
     x : array-like
         Normalized parameter vector with values in [0,1].
 
-    Returns
+    Returns:
     -------
     np.ndarray
         Physical HBV parameter vector.
@@ -420,8 +409,7 @@ def unscale(x):
 
 bounds = list(zip(p_min, p_max))
 def run_hbv_single(theta, forcing,shape_name):
-    """
-    Run a single HBV simulation with given parameter vector.
+    """Run a single HBV simulation with given parameter vector.
 
     Parameters
     ----------
@@ -432,7 +420,7 @@ def run_hbv_single(theta, forcing,shape_name):
     shape_name : str
         Catchment identifier (used for mm/day → m³/s conversion).
 
-    Returns
+    Returns:
     -------
     pd.Series
         Simulated discharge time series in m³/s.
@@ -455,8 +443,7 @@ def run_hbv_single(theta, forcing,shape_name):
 
 
 def objective(theta_norm, forcing, q_obs, years, shape_name):
-    """
-    Objective function for HBV calibration combining hydrograph fit and yearly volume error.
+    """Objective function for HBV calibration combining hydrograph fit and yearly volume error.
 
     Parameters
     ----------
@@ -471,17 +458,17 @@ def objective(theta_norm, forcing, q_obs, years, shape_name):
     shape_name : str
         Catchment identifier.
 
-    Returns
+    Returns:
     -------
     float
         Weighted objective value: (1 - NSE) + mean squared relative yearly volume error.
 
-    Notes
+    Notes:
     -----
     - NSE: Nash-Sutcliffe Efficiency measuring hydrograph fit.
     - Volume term: mean squared relative error in yearly total discharge.
     """
-    theta = unscale(theta_norm) 
+    theta = unscale(theta_norm)
     sim = run_hbv_single(theta, forcing, shape_name)
 
 
@@ -506,8 +493,7 @@ def objective(theta_norm, forcing, q_obs, years, shape_name):
 
 
 def volume_error(sim, obs):
-    """
-    Compute absolute relative volume error between simulated and observed discharge.
+    """Compute absolute relative volume error between simulated and observed discharge.
 
     Parameters
     ----------
@@ -516,7 +502,7 @@ def volume_error(sim, obs):
     obs : array-like
         Observed discharge.
 
-    Returns
+    Returns:
     -------
     float
         Absolute relative volume error: |1 - sum(sim)/sum(obs)|.
@@ -527,8 +513,7 @@ def volume_error(sim, obs):
 call_counter = {"n": 0}
 
 def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
-    """
-    Safe objective function for CMA-ES calibration of the HBV model.
+    """Safe objective function for CMA-ES calibration of the HBV model.
 
     Parameters
     ----------
@@ -544,12 +529,12 @@ def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
         Dictionary to store parameters, metrics, and evaluation info.
         Must be initialized outside this function.
 
-    Returns
+    Returns:
     -------
     float
         Weighted objective value: 0.3*(1-NSE) + 0.3*(1-KGE) + 0.4*VolumeError.
 
-    Notes
+    Notes:
     -----
     - NSE: Nash-Sutcliffe Efficiency.
     - KGE: Kling-Gupta Efficiency.
@@ -586,10 +571,9 @@ def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
     history.setdefault("vol_err", []).append(vol_err)
 
     return obj_val
-    
+
 def save_history(history, filename, folder="results", fmt="csv"):
-    """
-    Save CMA-ES calibration history to file.
+    """Save CMA-ES calibration history to file.
 
     Parameters
     ----------
@@ -632,8 +616,7 @@ def run_cma_multiple_seeds(
     popsize=15,
     maxfevals=500
 ):
-    """
-    Run multiple CMA-ES calibrations with different random seeds and collect histories.
+    """Run multiple CMA-ES calibrations with different random seeds and collect histories.
 
     Parameters
     ----------
@@ -654,7 +637,7 @@ def run_cma_multiple_seeds(
     maxfevals : int
         Maximum number of function evaluations per run.
 
-    Returns
+    Returns:
     -------
     results_list : list of dict
         Each element is a dict with keys 'res' (CMA-ES output) and 'history' (DataFrame of metrics).
@@ -701,8 +684,7 @@ def run_cma_single(
     bounds=(0.0, 1.0),
     save_folder=None,
 ):
-    """
-    Run a single CMA-ES calibration with a given random seed and save results optionally.
+    """Run a single CMA-ES calibration with a given random seed and save results optionally.
 
     Parameters
     ----------
@@ -723,7 +705,7 @@ def run_cma_single(
     save_folder : str or Path, optional
         Folder to save results as pickle. If None, no file is saved.
 
-    Returns
+    Returns:
     -------
     dict
         Dictionary containing:
@@ -734,8 +716,9 @@ def run_cma_single(
         - 'sigma_final': final step size
         - 'history': local history of the optimization
     """
-    import cma
     import pickle
+
+    import cma
     local_history = {}
 
     # Wrap the objective to use this local history
@@ -774,8 +757,7 @@ def run_cma_single(
     return result
 
 def wrap_objective_safe(forcing, q_obs, shape_name):
-    """
-    Create a “safe” objective function for HBV CMA-ES calibration with a fixed forcing and catchment.
+    """Create a “safe” objective function for HBV CMA-ES calibration with a fixed forcing and catchment.
 
     This returns a closure that wraps `objective_safe` with the provided forcing, 
     observed streamflow, and catchment name, so it only requires `theta_norm` 
@@ -790,7 +772,7 @@ def wrap_objective_safe(forcing, q_obs, shape_name):
     shape_name : str
         Name of the catchment.
 
-    Returns
+    Returns:
     -------
     callable
         Function of signature `objective(theta_norm, history)` compatible with CMA-ES.
@@ -809,8 +791,7 @@ def run_hbv_for_best_params(
     leave_pbar: bool = False,
     delete_files: bool = True
 ):
-    """
-    Load best parameter sets from a pickle file and run HBV simulations.
+    """Load best parameter sets from a pickle file and run HBV simulations.
 
     Parameters
     ----------
@@ -829,7 +810,7 @@ def run_hbv_for_best_params(
     delete_files : bool, optional
         Whether to delete temporary files after simulation.
 
-    Returns
+    Returns:
     -------
     list of dict
         Simulation results and parameters for each parameter set.
@@ -860,8 +841,7 @@ def run_hbv_simulations(
     leave_pbar: bool = False,
     delete_files: bool = True,
 ):
-    """
-    Run HBV simulations for a given catchment and set of parameter sets.
+    """Run HBV simulations for a given catchment and set of parameter sets.
 
     Parameters
     ----------
@@ -880,7 +860,7 @@ def run_hbv_simulations(
     delete_files : bool, optional
         Whether to delete temporary files after simulation. Default is True.
 
-    Returns
+    Returns:
     -------
     list of dict
         List of results for each parameter set. Each item contains the
