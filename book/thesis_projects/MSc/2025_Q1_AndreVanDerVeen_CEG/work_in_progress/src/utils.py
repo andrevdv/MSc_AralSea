@@ -23,7 +23,7 @@ from pyproj import Geod
 from shapely.geometry import shape
 
 from src.paths import INI_COMPARISON, SHAPEFILES
-
+from src.constants import KOPPEN_DESCRIPTION
 
 def catchment_area_from_shapefile(shape_name, ellps="WGS84"):
     """Compute the area (in m²) of the first polygon in a shapefile.
@@ -508,41 +508,6 @@ def build_grdc_metadata_table(
 
     return df
 
-KOPPEN_DESCRIPTION = {
-    "Af": "Tropical rainforest",
-    "Am": "Tropical monsoon",
-    "Aw": "Tropical savanna",
-    "BWh": "Hot desert",
-    "BWk": "Cold desert",
-    "BSh": "Hot steppe",
-    "BSk": "Cold steppe",
-    "Csa": "Mediterranean, hot summer",
-    "Csb": "Mediterranean, warm summer",
-    "Csc": "Mediterranean, cold summer",
-    "Cwa": "Temperate, dry winter, hot summer",
-    "Cwb": "Temperate, dry winter, warm summer",
-    "Cwc": "Temperate, dry winter, cold summer",
-    "Cfa": "Temperate, no dry season, hot summer",
-    "Cfb": "Temperate, no dry season, warm summer",
-    "Cfc": "Temperate, no dry season, cold summer",
-    "Dsa": "Snow, dry summer, hot summer",
-    "Dsb": "Snow, dry summer, warm summer",
-    "Dsc": "Snow, dry summer, cold summer",
-    "Dsd": "Snow, dry summer, very cold summer",
-    "Dwa": "Snow, dry winter, hot summer",
-    "Dwb": "Snow, dry winter, warm summer",
-    "Dwc": "Snow, dry winter, cold summer",
-    "Dwd": "Snow, dry winter, very cold winter",
-    "Dfa": "Snow, no dry season, hot summer",
-    "Dfb": "Snow, no dry season, warm summer",
-    "Dfc": "Snow, no dry season, cold summer",
-    "Dfd": "Snow, no dry season, very cold winter",
-    "ET": "Tundra",
-    "EF": "Ice cap"
-}
-
-
-
 
 def compute_koppen_class_counts(path_to_file, shapefiles=None, class_names=None, extent=None):
     """Compute pixel counts for Köppen-Geiger classes for raster and optional shapefiles.
@@ -771,11 +736,9 @@ def extract_scenario_and_year(path):
     scenario = parts[year_index+1] if (year_index+1 < len(parts)-1) else None
     return year_range, scenario
 
-from pathlib import Path
 
-import pandas as pd
 
-from src.constants import KOPPEN_DESCRIPTION
+
 
 
 def load_koppen_pickles_from_folder(pkl_folder):
