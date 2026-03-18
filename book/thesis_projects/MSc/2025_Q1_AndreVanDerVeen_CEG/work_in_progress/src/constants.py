@@ -137,9 +137,11 @@ PCRGLOBWB_ESMVALTOOL_PADDING = 2  # degrees, padding for forcing extraction
 STATIONS_PCR = {
     "Chatly": {"lat": 42.2, "lon": 60.2},
     "Kazalinsk": {"lat": 45.7, "lon": 62.12},
-    "Kerki": {"lat": 37.83, "lon": 65.25},
+    "Kerki": {"lat": 37.83, "lon": 65.30},
     "Tyumen-Aryk": {"lat": 43.95, "lon": 67.05},
-    "Karaozek": {"lat": 44.95, "lon": 65.27},
+    #"Karaozek": {"lat": 44.95, "lon": 65.27},
+    "Uch-Kurgan": {"lat": 41.12, "lon": 72.10},
+    "Garm": {"lat": 39.05, "lon": 70.33},
 }
 
 
