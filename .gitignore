@@ -194,3 +194,6 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/outputs/mo
 **/complete_seperate_run/**
 **/complete_pcrglob_run/**
 **/bias_mapping/forcing/output
+**/era5_parallel_runs/**
+**/era5_parallel_runs_no_agri/**
+**/cmip_parallel_runs/**
