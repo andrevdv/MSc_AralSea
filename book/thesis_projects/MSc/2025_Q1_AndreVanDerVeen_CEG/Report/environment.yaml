@@ -1,26 +1,35 @@
 name: aral_env
 channels:
   - conda-forge
+
 dependencies:
   - python=3.10
+
+  # workflow engine
+  - snakemake
+  - pulp
+
+  # core scientific stack (keep conda-forge to avoid pip conflicts)
+  - numpy=1.26
+  - pandas=2.2
+  - scipy
+  - xarray
+  - matplotlib
+  - tqdm
+
+  # geospatial stack (MUST be conda-forge, not pip)
+  - cartopy
+  - rasterio
+  - fiona
+  - pyproj
+  - shapely
+
+  # optional utilities
+  - pydantic
+  - requests
+  - pytest
+
+  # pip-only packages (kept minimal on purpose)
   - pip
   - pip:
-      - Cartopy==0.24.0
-      - cma==4.4.4
-      - ewatercycle==2.4.0
-      - ewatercycle_pcrglobwb==0.0.2
-      - fiona==1.10.1
-      - matplotlib==3.8.4
-      - numpy==2.4.4
-      - pandas==3.0.2
-      - pydantic==2.13.4
-      - pyproj==3.7.0
       - python_cmethods==2.3.2
-      - rasterio==1.4.1
-      - requests==2.33.1
-      - scipy==1.17.1
-      - shapely==2.1.2
-      - tqdm==4.67.1
-      - xarray==2024.11.0
-      - xesmf==0.8.7
-      - pytest==8.3.4
