@@ -14,7 +14,8 @@ In short:
 
 
 ## Requirements
-- for now: requirements.txt
+- for now: requirements.yaml
+- requires snakemake
 
 ## Installation
 - 
