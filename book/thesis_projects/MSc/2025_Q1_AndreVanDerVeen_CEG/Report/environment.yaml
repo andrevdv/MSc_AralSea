@@ -1,35 +1,26 @@
 name: aral_env
 channels:
+  - bioconda
   - conda-forge
-
+  - nodefaults
 dependencies:
   - python=3.10
-
-  # workflow engine
   - snakemake
   - pulp
-
-  # core scientific stack (keep conda-forge to avoid pip conflicts)
-  - numpy=1.26
-  - pandas=2.2
+  - numpy
+  - pandas
   - scipy
   - xarray
   - matplotlib
   - tqdm
-
-  # geospatial stack (MUST be conda-forge, not pip)
   - cartopy
   - rasterio
   - fiona
   - pyproj
   - shapely
-
-  # optional utilities
   - pydantic
   - requests
   - pytest
-
-  # pip-only packages (kept minimal on purpose)
   - pip
   - pip:
       - python_cmethods==2.3.2
