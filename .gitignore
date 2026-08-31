@@ -201,7 +201,13 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/outputs/mo
 **/run_1965_1995/**
 **/run_1990_2020/**
 **/run_1990_2014/**
+**/channel_experiment_reference/**
+**/channel_experiment_set_storage/**
+**/channel_experiment_set_multiple_storage/**
+**/channel_experiment_set_wave_storage/**
+**/karalkum_experiment_get_value/**
+**/karalkum_experiment_set_value/**
 
 *.pdf
 
-**/work_in_progress/**
+#**/work_in_progress/**
