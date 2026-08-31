@@ -25,7 +25,7 @@ While the framework is tailored to the Aral Sea, parts of the workflows and tool
 
 
 ## Overview
-the project has both the work in progress saved in the [work_in_progress](./work_in_progress/) folder as well as the code used in the final report in [report](./Report/)
+the project has both the work in progress saved in the [work_in_progress](./book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/) folder as well as the code used in the final report in [report](./book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/Report/Report/)
 
 
 
