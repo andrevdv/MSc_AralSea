@@ -12,14 +12,138 @@ from pathlib import Path
 import cma
 import ewatercycle.models
 import numpy as np
+#import optuna
 import pandas as pd
 import xarray as xr
 from tqdm.notebook import tqdm
+from ewatercycle.container import ContainerImage
 
 from src.constants import HBV_PARAM_BOUNDS, PARAMETER_NAMES
 from src.forcing import load_lumped_forcing_data
 from src.paths import INI_FILES, OUTPUT_HBV, PCR_GLOBAL_PARAMS
 from src.utils import mmday_to_m3s
+
+
+# def run_optuna_single(
+#     optuna_seed,
+#     objective_fn,
+#     n_trials,
+#     n_jobs=1,
+#     show_progress_bar=False,
+#     save_folder=None,
+#     study_name=None,
+# ):
+#     """Run a single Optuna-TPE calibration for HBV and optionally save results.
+
+#     Parameters
+#     ----------
+#     optuna_seed : int
+#         Random seed for Optuna sampler.
+#     objective_fn : callable
+#         Objective function with signature ``objective(theta_norm, history)``.
+#     n_trials : int
+#         Number of Optuna trials.
+#     n_jobs : int, optional
+#         Number of workers for Optuna internal parallelization.
+#     show_progress_bar : bool, optional
+#         Whether to display the Optuna progress bar.
+#     save_folder : str or Path, optional
+#         Folder where the run result pickle is stored.
+#     study_name : str, optional
+#         Optional custom name for the Optuna study.
+
+#     Returns:
+#     -------
+#     dict
+#         Dictionary containing seed, best objective, best parameter vectors,
+#         trial count, study name, and objective history.
+#     """
+#     local_history = {}
+
+#     if study_name is None:
+#         study_name = f"optuna_seed_{optuna_seed}"
+
+#     sampler = optuna.samplers.TPESampler(seed=optuna_seed)
+#     study = optuna.create_study(direction="minimize", sampler=sampler, study_name=study_name)
+
+#     def objective_wrapped(trial):
+#         theta_norm = np.array([
+#             trial.suggest_float(name, 0.0, 1.0)
+#             for name in parameter_names
+#         ])
+#         return float(objective_fn(theta_norm, local_history))
+
+#     study.optimize(
+#         objective_wrapped,
+#         n_trials=n_trials,
+#         n_jobs=n_jobs,
+#         show_progress_bar=show_progress_bar,
+#     )
+
+#     best_x_norm = np.array([study.best_params[name] for name in parameter_names])
+
+#     result = {
+#         "seed": optuna_seed,
+#         "best_f": float(study.best_value),
+#         "best_x": best_x_norm,
+#         "best_x_phys": unscale(best_x_norm),
+#         "n_trials": len(study.trials),
+#         "study_name": study_name,
+#         "history": local_history.copy(),
+#     }
+
+#     if save_folder is not None:
+#         save_folder = Path(save_folder)
+#         save_folder.mkdir(parents=True, exist_ok=True)
+#         file_path = save_folder / f"optuna_result_seed_{optuna_seed}.pkl"
+#         with open(file_path, "wb") as f:
+#             pickle.dump(result, f)
+
+#     return result
+
+
+# def run_optuna_multiple_seeds(
+#     seeds,
+#     objective_fn,
+#     n_trials,
+#     n_jobs=1,
+#     show_progress_bar=False,
+#     save_folder=None,
+# ):
+#     """Run Optuna calibration for multiple seeds and collect results.
+
+#     Parameters
+#     ----------
+#     seeds : list of int
+#         Random seeds for independent Optuna studies.
+#     objective_fn : callable
+#         Objective function with signature ``objective(theta_norm, history)``.
+#     n_trials : int
+#         Number of trials per seed.
+#     n_jobs : int, optional
+#         Number of workers for Optuna internal parallelization.
+#     show_progress_bar : bool, optional
+#         Whether to show progress bars.
+#     save_folder : str or Path, optional
+#         Folder where result pickles are stored.
+
+#     Returns:
+#     -------
+#     list of dict
+#         Optuna results returned by ``run_optuna_single``.
+#     """
+#     return [
+#         run_optuna_single(
+#             optuna_seed=s,
+#             objective_fn=objective_fn,
+#             n_trials=n_trials,
+#             n_jobs=n_jobs,
+#             show_progress_bar=show_progress_bar,
+#             save_folder=save_folder,
+#             study_name=f"optuna_seed_{s}",
+#         )
+#         for s in seeds
+#     ]
 
 
 def simulate_HBV(
@@ -271,6 +395,92 @@ def simulate_PCRGLOBWB(forcing_path, ini_name, start_date, end_date):
 
     model_config, model_dir = model.setup(
         start_time=start_date, end_time=end_date, max_spinups_in_years=0
+    )
+
+    model.initialize(model_config)
+
+    pbar.set_description("Running model")
+    while model.time < model.end_time:
+        model.update()
+        pbar.update(1)
+
+    pbar.close()
+    tqdm.write("Model run finished!")
+
+    model.finalize()
+
+def simulate_PCRGLOBWB_experiment(forcing_path, ini_name, start_date, end_date, output_dir):
+    """Run the PCR-GLOBWB hydrological model for a given forcing and configuration.
+
+    This function sets up and executes a PCR-GLOBWB simulation using the
+    specified forcing data and parameter INI file. Currently, it relies on
+    the eWaterCycle framework and a hardcoded location for global PCR-GLOBWB
+    parameter sets. Progress is displayed with a tqdm bar.
+
+    Parameters
+    ----------
+    forcing_path : str or Path
+        Path to the folder containing PCR-GLOBWB forcing files.
+    ini_name : str
+        Name of the configuration INI file (e.g., "my_catchment.ini").
+        This file should exist in the `INI_FILES` directory.
+    start_date : str
+        Start date of the simulation in ISO 8601 format (e.g., "1950-01-01T00:00:00Z").
+    end_date : str
+        End date of the simulation in ISO 8601 format (e.g., "2020-12-31T00:00:00Z").
+
+    Returns:
+    -------
+    None
+        The function writes output to the eWaterCycle-managed model directory.
+        Results can be accessed from the `model.output_dir` or via other
+        eWaterCycle utilities.
+
+    Notes:
+    -----
+    - The function currently hardcodes the location of global parameter sets:
+      `/data/shared/parameter-sets/pcrglobwb_global`.
+    - The `supported_model_versions` is currently set to `{"setters"}`
+    - Simulation progress is displayed via a tqdm progress bar.
+    - This function does not return Python objects with results; output files
+      must be read separately after the run.
+    """
+    from tqdm import tqdm as classic_tqdm
+
+    bmi_image = ContainerImage("/home/avandervee3/ewatercycle_pcr_25mar.sif")
+
+    # Convert ISO 8601 strings to datetime objects
+    start_time = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
+    end_time = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%SZ")
+
+    # Calculate the number of days for the progression bar
+    delta = end_time - start_time
+    number_of_days = delta.days
+
+    pbar = classic_tqdm(total=number_of_days, desc="Initializing model", mininterval=1.0)
+
+    # can be hardcoded, location of all the pcr-glob data on ewatercycle
+    pcr_glob_directory = PCR_GLOBAL_PARAMS
+
+    forcing = ewatercycle.forcing.sources["PCRGlobWBForcing"].load(
+        directory=forcing_path,
+    )
+
+    parameter_set = ewatercycle.parameter_sets.ParameterSet(
+        name="custom_parameter_set",
+        directory=pcr_glob_directory,
+        config=INI_FILES / ini_name,
+        target_model="pcrglobwb",
+        supported_model_versions={"25mar"},
+    )
+
+    model = ewatercycle.models.PCRGlobWB(parameter_set=parameter_set, forcing=forcing, bmi_image=bmi_image)
+
+    model_config, model_dir = model.setup(
+        cfg_dir=output_dir,
+        start_time=start_date,
+        end_time=end_date,
+        max_spinups_in_years=0
     )
 
     model.initialize(model_config)
@@ -583,6 +793,41 @@ def objective_HBV_safe(theta_norm, forcing, q_obs, shape_name, history):
 
     return obj_val
 
+def objective_HBV_safe_unscaled(theta_phys, forcing, q_obs, shape_name):
+    """
+    Safe objective function for calibration of the HBV model using unscaled parameters.
+    """
+    call_counter["n"] += 1
+
+    # Unscale parameters for HBV
+    theta_phys = theta_phys
+
+    # Run HBV
+    sim = run_hbv_single(theta_phys, forcing, shape_name)
+
+    # --- Metrics ---
+    nse = 1 - np.sum((sim - q_obs) ** 2) / np.sum((q_obs - q_obs.mean()) ** 2)
+
+    r = np.corrcoef(sim, q_obs)[0, 1]
+    alpha = np.std(sim) / np.std(q_obs)
+    beta = np.mean(sim) / np.mean(q_obs)
+    kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
+
+    vol_err = volume_error(sim, q_obs)
+
+    # --- Combined objective ---
+    obj_val = 0.3 * (1 - nse) + 0.3 * (1 - kge) + 0.4 * vol_err
+
+    # --- Store in history ---
+    # history.setdefault("theta_norm", []).append(theta_norm.copy())
+    # history.setdefault("theta_phys", []).append(theta_phys.copy())
+    # history.setdefault("objective", []).append(obj_val)
+    # history.setdefault("nse", []).append(nse)
+    # history.setdefault("kge", []).append(kge)
+    # history.setdefault("vol_err", []).append(vol_err)
+
+    return obj_val
+
 
 def save_history(history, filename, folder="results", fmt="csv"):
     """Save CMA-ES calibration history to file.
@@ -789,6 +1034,33 @@ def wrap_objective_safe(forcing, q_obs, shape_name):
 
     return objective
 
+def wrap_objective_safe_unscaled(forcing, q_obs, shape_name):
+    """Create a “safe” objective function for HBV CMA-ES calibration with a fixed forcing and catchment.
+
+    This returns a closure that wraps `objective_safe` with the provided forcing,
+    observed streamflow, and catchment name, so it only requires `theta_norm`
+    and `history` during optimization.
+
+    Parameters
+    ----------
+    forcing : pd.DataFrame or dict
+        Meteorological forcing data for the HBV model.
+    q_obs : pd.Series
+        Observed streamflow time series.
+    shape_name : str
+        Name of the catchment.
+
+    Returns:
+    -------
+    callable
+        Function of signature `objective(theta_norm, history)` compatible with CMA-ES.
+    """
+
+    def objective(theta_phys):
+        return objective_HBV_safe_unscaled(theta_phys, forcing, q_obs, shape_name)
+
+    return objective
+
 
 def run_hbv_for_best_params(
     shapefile: str,
@@ -930,3 +1202,5 @@ run_cma = run_cma_single
 make_objective_safe = wrap_objective_safe
 objective_safe = objective_HBV_safe
 run_cma_ensemble = run_cma_multiple_seeds
+# run_optuna = run_optuna_single
+# run_optuna_ensemble = run_optuna_multiple_seeds

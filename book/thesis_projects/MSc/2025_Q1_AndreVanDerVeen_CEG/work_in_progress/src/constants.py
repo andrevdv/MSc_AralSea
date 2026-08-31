@@ -149,7 +149,8 @@ STATIONS_PCR = {
 # Aral Sea Model Constants
 # ==============================================================================
 MAKKINK_FACTOR = (
-    1.15  # Makkink correction factor (dimensionless) for open water evaporation estimation
+    1.00 # Makkink correction factor (dimensionless) for open water evaporation estimation
+    # add source for this: range is 1.0 to 1.2? Might be open pan vs dynamic surface water?
 )
 GROUNDWATER_INFLOW = 1 / 365
 

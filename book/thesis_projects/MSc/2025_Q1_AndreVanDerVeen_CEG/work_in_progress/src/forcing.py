@@ -8,7 +8,9 @@ hydrological models within the eWaterCycle framework. It supports:
 - Bias correction and regridding
 """
 
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import ewatercycle.forcing
 import matplotlib.pyplot as plt
@@ -556,6 +558,7 @@ def _regrid_cmip_forcing_to_era5(
     cmip_path,
     era5_path,
     overwrite=True,
+    time_chunk_size=365,
 ):
     """Internal Helper, Regrid CMIP forcing exactly onto ERA5 grid.
 
@@ -567,6 +570,8 @@ def _regrid_cmip_forcing_to_era5(
         ERA5 forcing NetCDF file (target grid).
     overwrite : bool
         Overwrite CMIP file after regridding.
+    time_chunk_size : int, optional
+        Number of time steps to keep in memory per chunk while regridding.
 
     Returns:
     -------
@@ -576,8 +581,13 @@ def _regrid_cmip_forcing_to_era5(
     cmip_path = Path(cmip_path)
     era5_path = Path(era5_path)
 
-    ds_cmip = xr.load_dataset(cmip_path)
-    ds_era5 = xr.load_dataset(era5_path)
+    if not cmip_path.exists():
+        raise FileNotFoundError(f"CMIP forcing file does not exist: {cmip_path}")
+    if cmip_path.stat().st_size == 0:
+        raise ValueError(f"CMIP forcing file is empty: {cmip_path}")
+
+    ds_cmip = xr.open_dataset(cmip_path, chunks={"time": time_chunk_size})
+    ds_era5 = xr.open_dataset(era5_path)
 
     # Basic grid sanity check
     for dim in ("lat", "lon"):
@@ -595,8 +605,10 @@ def _regrid_cmip_forcing_to_era5(
         raise RuntimeError("Unhandled forcing type")
 
     # Create regridder
+    source_grid = ds_cmip.isel(time=0, drop=True) if "time" in ds_cmip.dims else ds_cmip
+
     regridder = xe.Regridder(
-        ds_cmip,
+        source_grid,
         ds_era5,
         method=method,
         extrap_method=extrap_method,
@@ -612,7 +624,14 @@ def _regrid_cmip_forcing_to_era5(
     ds_out.attrs["regridding_method"] = method
 
     if overwrite:
-        ds_out.to_netcdf(cmip_path)
+        with NamedTemporaryFile(dir=cmip_path.parent, suffix=".tmp", delete=False) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+        try:
+            ds_out.to_netcdf(tmp_path)
+            tmp_path.replace(cmip_path)
+        finally:
+            if tmp_path.exists() and tmp_path != cmip_path:
+                tmp_path.unlink(missing_ok=True)
 
     return ds_out
 
@@ -644,7 +663,222 @@ def detect_forcing_variable(ds):
 # - Uses ERA5 as reference
 # ===========================================================================
 
-# Needs more testing.
+def bias_map_pcrglobwb_forcing(
+    cmip_future_forcing,
+    cmip_historical_forcing,
+    era5_forcing,
+    method="quantile_delta_mapping",
+    n_quantiles=1000,
+    overwrite=True,
+    spatial_chunk_size=16,
+):
+    """Bias-correct CMIP future PCR-GLOBWB forcing with ERA5 reference.
+
+    Parameters
+    ----------
+    cmip_future_forcing : PCRGlobWBForcing
+        CMIP future forcing object to be corrected.
+    cmip_historical_forcing : PCRGlobWBForcing
+        CMIP historical forcing object used as model baseline.
+    era5_forcing : PCRGlobWBForcing
+        ERA5 forcing object used as observational reference.
+    method : str
+        Bias-correction method from cmethods.
+    n_quantiles : int
+        Number of quantiles for quantile-based methods.
+    overwrite : bool
+        Overwrite CMIP future files after correction.
+    spatial_chunk_size : int
+        Chunk size used for lat/lon while correcting.
+
+    Returns:
+    -------
+    None
+        NetCDF files in cmip_future_forcing.directory are overwritten.
+    """
+    _bias_map_cmip_future_with_era5(
+        obs_path=era5_forcing.directory / era5_forcing.precipitationNC,
+        simh_path=cmip_historical_forcing.directory / cmip_historical_forcing.precipitationNC,
+        simp_path=cmip_future_forcing.directory / cmip_future_forcing.precipitationNC,
+        method=method,
+        n_quantiles=n_quantiles,
+        kind="*",
+        overwrite=overwrite,
+        spatial_chunk_size=spatial_chunk_size,
+    )
+    _bias_map_cmip_future_with_era5(
+        obs_path=era5_forcing.directory / era5_forcing.temperatureNC,
+        simh_path=cmip_historical_forcing.directory / cmip_historical_forcing.temperatureNC,
+        simp_path=cmip_future_forcing.directory / cmip_future_forcing.temperatureNC,
+        method=method,
+        n_quantiles=n_quantiles,
+        kind="+",
+        overwrite=overwrite,
+        spatial_chunk_size=spatial_chunk_size,
+    )
+
+
+def _pick_variable_name(ds, preferred_names):
+    """Pick the first matching variable name, or fall back to the first variable."""
+    for name in preferred_names:
+        if name in ds.data_vars:
+            return name
+    return list(ds.data_vars)[0]
+
+
+def _assert_writable_target(path):
+    """Fail fast when output location is not writable."""
+    path = Path(path)
+    parent = path.parent
+
+    if not parent.exists():
+        raise FileNotFoundError(f"Output directory does not exist: {parent}")
+
+    # Directory write+execute is required to create temporary files.
+    if not parent.is_dir() or not os.access(parent, os.W_OK | os.X_OK):
+        raise PermissionError(f"No write permission in output directory: {parent}")
+
+    # If target already exists, we also need permission to replace it.
+    if path.exists() and not os.access(path, os.W_OK):
+        raise PermissionError(f"No write permission for output file: {path}")
+
+    # Try creating and removing a tiny probe file in the output directory.
+    probe = None
+    try:
+        with NamedTemporaryFile(dir=parent, prefix=".write_check_", delete=False) as tmp:
+            probe = Path(tmp.name)
+    except PermissionError as exc:
+        raise PermissionError(f"Cannot create files in output directory: {parent}") from exc
+    finally:
+        if probe and probe.exists():
+            probe.unlink(missing_ok=True)
+
+
+def _bias_map_cmip_future_with_era5(
+    obs_path,
+    simh_path,
+    simp_path,
+    method,
+    n_quantiles,
+    kind,
+    overwrite=True,
+    spatial_chunk_size=16,
+):
+    """Internal helper to bias-correct one forcing variable (pr or tas)."""
+    try:
+        from cmethods import adjust
+    except ImportError as exc:
+        raise ImportError(
+            "Bias mapping requires cmethods. Install it with: pip install cmethods"
+        ) from exc
+
+    obs_path = Path(obs_path)
+    simh_path = Path(simh_path)
+    simp_path = Path(simp_path)
+
+    for p in (obs_path, simh_path, simp_path):
+        if not p.exists():
+            raise FileNotFoundError(f"Bias mapping input does not exist: {p}")
+        if p.stat().st_size == 0:
+            raise ValueError(f"Bias mapping input is empty: {p}")
+
+    if overwrite:
+        _assert_writable_target(simp_path)
+
+    obs_ds = xr.open_dataset(obs_path, chunks={"time": 365})
+    simh_ds = xr.open_dataset(simh_path, chunks={"time": 365})
+    simp_ds = xr.open_dataset(simp_path, chunks={"time": 365})
+
+    forcing_type = detect_forcing_variable(simh_ds)
+    if forcing_type == "precipitation":
+        candidates = ("pr", "precipitation", "tp")
+    elif forcing_type == "temperature":
+        candidates = ("tas", "t2m", "temperature")
+    else:
+        raise RuntimeError("Unhandled forcing type")
+
+    obs_var = _pick_variable_name(obs_ds, candidates)
+    simh_var = _pick_variable_name(simh_ds, candidates)
+    simp_var = _pick_variable_name(simp_ds, candidates)
+
+    obs = obs_ds[obs_var]
+    simh = simh_ds[simh_var]
+    simp = simp_ds[simp_var]
+
+    # Preserve key output encoding from the original future variable.
+    simp_var_encoding = {}
+    for key in (
+        "dtype",
+        "_FillValue",
+        "scale_factor",
+        "add_offset",
+        "zlib",
+        "complevel",
+        "shuffle",
+        "fletcher32",
+        "contiguous",
+        "chunksizes",
+    ):
+        value = simp.encoding.get(key)
+        if value is not None:
+            simp_var_encoding[key] = value
+
+    target_dtype = simp_var_encoding.get("dtype", simp.dtype)
+
+    # cmethods expects matching non-time coordinates.
+    if "lat" in simh.dims and "lon" in simh.dims:
+        obs = obs.interp(lat=simh["lat"], lon=simh["lon"], method="linear")
+        simp = simp.interp(lat=simh["lat"], lon=simh["lon"], method="linear")
+
+    obs, simh = xr.align(obs, simh, join="inner")
+
+    # cmethods runs apply_ufunc with time as a core dimension.
+    qdm_chunks = {"time": -1}
+    if "lat" in simh.dims:
+        qdm_chunks["lat"] = spatial_chunk_size
+    if "lon" in simh.dims:
+        qdm_chunks["lon"] = spatial_chunk_size
+
+    obs_qdm = obs.chunk(qdm_chunks)
+    simh_qdm = simh.chunk(qdm_chunks)
+    simp_qdm = simp.chunk(qdm_chunks)
+
+    corrected = adjust(
+        method=method,
+        obs=obs_qdm,
+        simh=simh_qdm,
+        simp=simp_qdm,
+        n_quantiles=n_quantiles,
+        kind=kind,
+    )
+
+    if isinstance(corrected, xr.Dataset):
+        corr_var = list(corrected.data_vars)[0]
+        corrected_da = corrected[corr_var].rename(simp_var)
+    else:
+        corrected_da = corrected.rename(simp_var)
+
+    corrected_da = corrected_da.astype(target_dtype)
+    corrected_da.attrs.update(simp.attrs)
+
+    ds_out = simp_ds.copy()
+    ds_out[simp_var] = corrected_da
+    ds_out.attrs.update(simp_ds.attrs)
+    ds_out.attrs["bias_corrected_with"] = "ERA5"
+    ds_out.attrs["bias_correction_method"] = method
+    ds_out.attrs["bias_correction_kind"] = kind
+
+    if overwrite:
+        with NamedTemporaryFile(dir=simp_path.parent, suffix=".tmp", delete=False) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+        try:
+            ds_out.to_netcdf(tmp_path, encoding={simp_var: simp_var_encoding})
+            tmp_path.replace(simp_path)
+        finally:
+            if tmp_path.exists() and tmp_path != simp_path:
+                tmp_path.unlink(missing_ok=True)
+
+    return ds_out
 
 
 # ---------------------------
@@ -655,3 +889,4 @@ setup_CMIP_future_forcing = generate_lumped_CMIP_future_forcing
 setup_ERA5_PCR_forcing = generate_PCRGLOBWB_ERA5_forcing
 setup_cmip_hist_PCR_forcing = generate_PCRGLOBWB_CMIP_historical_forcing
 setup_cmip_fut_PCR_forcing = generate_PCRGLOBWB_CMIP_future_forcing
+setup_bias_map_pcr_forcing = bias_map_pcrglobwb_forcing
