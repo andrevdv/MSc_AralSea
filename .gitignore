@@ -208,6 +208,10 @@ book/thesis_projects/MSc/2025_Q1_AndreVanDerVeen_CEG/work_in_progress/outputs/mo
 **/karalkum_experiment_get_value/**
 **/karalkum_experiment_set_value/**
 **/channel_experiment_addition/**
+**/channel_experiment_different_clonemap/**
+**/kemijoki/forcing/**
+**/kemijoki/shapefiles/**
+**/kemijoki_experiment/**
 
 *.pdf
 
